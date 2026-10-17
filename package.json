@@ -1,11 +1,11 @@
 {
   "name": "aim-tracker",
   "productName": "Aim Tracker",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Local KovaaK's aim training journal and plan tracker",
   "author": "KlekzZ",
   "license": "UNLICENSED",
-  "main": "src/main/main.js",
+  "main": "src/main/bootstrap.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/KlekzZ/aim-tracker.git"
@@ -42,9 +42,6 @@
         "releaseType": "draft"
       }
     ]
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "chart.js": "^4.5.1",

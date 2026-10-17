@@ -30,4 +30,17 @@ jobs:
       - run: npm test
       - run: gh release create ${{ github.ref_name }} --draft --title "${{ github.ref_name }}" --notes "Automatisk build af ${{ github.ref_name }}"
       - run: npx electron-builder --win --publish always
+      # Code-only update: the app's code (app.asar) plus a small manifest with
+      # its SHA-512 checksum. Installed apps download this instead of a new
+      # installer, because Windows Smart App Control blocks unsigned installers.
+      - name: Add code-only update
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $electron = (Get-Content node_modules/electron/package.json -Raw | ConvertFrom-Json).version
+          $file = "app-$version.asar"
+          Copy-Item dist/win-unpacked/resources/app.asar "dist/$file"
+          $sha512 = (Get-FileHash "dist/$file" -Algorithm SHA512).Hash.ToLower()
+          @{ version = $version; file = $file; sha512 = $sha512; electron = $electron } | ConvertTo-Json | Set-Content dist/app-update.json -Encoding utf8
+          gh release upload ${{ github.ref_name }} "dist/$file" dist/app-update.json
       - run: gh release edit ${{ github.ref_name }} --draft=false --latest

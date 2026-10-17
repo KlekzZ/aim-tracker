@@ -9,6 +9,7 @@ const { buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone }
 const kovaaks = require('./kovaaks');
 const { loadSettings, saveSettings } = require('./app-settings');
 const updater = require('./updater');
+const { codeVersion } = require('./version');
 
 let window = null;
 let database = null;
@@ -120,7 +121,7 @@ function registerIpc() {
     buildData(database, {
       statsDir: settings.statsDir,
       autoUpdate: settings.autoUpdate,
-      appVersion: app.getVersion(),
+      appVersion: codeVersion,
       lastScan,
       updateStatus,
       playlistStatus,
