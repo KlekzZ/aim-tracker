@@ -1,6 +1,10 @@
 # Builds the Windows installer and publishes it as a GitHub Release when
-# you push a version tag (e.g. v0.2.0). The installed app finds new
+# you push a version tag (e.g. v0.3.0). The installed app finds new
 # releases here and updates itself.
+#
+# The release is created as a draft first and published at the end. If
+# electron-builder creates it itself, its parallel uploads can create two
+# releases for the same tag, which confuses the auto-updater.
 name: Release
 
 on:
@@ -14,14 +18,16 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: gh release create ${{ github.ref_name }} --draft --title "${{ github.ref_name }}" --notes "Automatisk build af ${{ github.ref_name }}"
       - run: npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: gh release edit ${{ github.ref_name }} --draft=false --latest
