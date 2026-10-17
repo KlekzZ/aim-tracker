@@ -17,7 +17,7 @@ function renderLog(data) {
       <td class="num">${num(r.score, 1)}</td>
       <td class="num">${pct(r.accuracy)}</td>
       <td class="${r.sensChanged ? 'changed' : ''}">${esc(r.sensScale)} ${num(r.sens, 2)} <span class="muted">·</span> ${num(r.dpi)} DPI</td>
-      <td class="num ${r.sensChanged ? 'changed' : ''}">${r.cm360 === null ? '?' : `${num(r.cm360, 1)} cm`}${r.sensChanged ? ' <span class="pill warning">ny sens</span>' : ''}</td>
+      <td class="num ${r.sensChanged ? 'changed' : ''}">${r.cm360 === null ? '?' : `${num(r.cm360, 1)} cm`}${r.sensChanged ? ' <span class="pill warning">ny sens</span>' : ''}${r.fingertipTooSlow ? ' <span class="pill warning" title="Viscose: Fingertip kræver 50 cm/360 eller hurtigere, så scoren tæller ikke">for langsom</span>' : ''}</td>
     </tr>`).join('');
 
   const filter = `<label class="toggle"><input type="checkbox" id="only-challenge" ${onlyChallenge ? 'checked' : ''}>Kun Challenge-runs</label>`;

@@ -79,9 +79,51 @@ function scenarioSummaries(runs, thresholds, targets) {
   });
 }
 
+// ---------- Viscose benchmarks ----------
+// Viscose has three benchmarks (Easier, Medium, Hard), each with its own rank
+// ladder (8, 8 and 6 ranks). The summaries use the same shape as Voltaic's,
+// so the Scenarios page can show both in the same table.
+
+// A run counts for a scenario if it was played on a valid sens. Viscose says
+// Fingertip scenarios are invalid slower than 50 cm/360 (max_cm360 in the file).
+// If we can't work out the cm/360, we trust the run instead of throwing it away.
+function isValidRun(run, scenario) {
+  if (!scenario.max_cm360 || run.cm360 === null || run.cm360 === undefined) return true;
+  return run.cm360 <= scenario.max_cm360;
+}
+
+function benchmarkSummaries(runs, benchmark) {
+  const groups = groupRunsByScenario(runs);
+
+  return benchmark.scenarios.map((scenario) => {
+    const allRuns = groups.get(normalize(scenario.name)) || [];
+    const validRuns = allRuns.filter((run) => isValidRun(run, scenario));
+    const scores = validRuns.map((run) => run.score);
+    const best = scores.length ? Math.max(...scores) : null;
+
+    return {
+      name: scenario.name,
+      category: scenario.category,
+      subcategory: scenario.subcategory,
+      thresholds: scenario.thresholds,
+      rankNames: benchmark.ranks,
+      baselineBest: null,
+      runCount: validRuns.length,
+      invalidRunCount: allRuns.length - validRuns.length, // played too slow for Fingertip
+      maxCm360: scenario.max_cm360 || null,
+      best,
+      medianLast3: median(scores.slice(-3)),
+      ...rankInfo(best, scenario, benchmark.ranks),
+      target: null,
+    };
+  });
+}
+
 // Scenario names in the runs that are not in the thresholds file.
+// thresholds can be one object with .scenarios, or a list of them.
 function unmatchedScenarios(runs, thresholds) {
-  const known = new Set(thresholds.scenarios.map((s) => normalize(s.name)));
+  const lists = Array.isArray(thresholds) ? thresholds : [thresholds];
+  const known = new Set(lists.flatMap((list) => list.scenarios.map((s) => normalize(s.name))));
   const counts = new Map();
   for (const run of runs) {
     if (known.has(normalize(run.scenario))) continue;
@@ -153,6 +195,8 @@ module.exports = {
   median,
   rankInfo,
   scenarioSummaries,
+  benchmarkSummaries,
+  isValidRun,
   unmatchedScenarios,
   radarData,
   groupSessions,

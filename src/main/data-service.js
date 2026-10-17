@@ -14,6 +14,7 @@ const readJson = (...parts) => JSON.parse(fs.readFileSync(path.join(appRoot, ...
 
 const config = readJson('data', 'config.json');
 const thresholds = readJson('data', 'voltaic_s5_5_thresholds.json');
+const viscose = readJson('data', 'viscose_thresholds.json');
 const targets = readJson('data', 'targets.json').targets;
 const programData = readJson('data', 'program.json');
 const passes = program.buildPasses(programData);
@@ -24,7 +25,13 @@ const allPlanCodes = [...new Set([
   ...Object.values(shareCodes.adept),
   ...Object.values(shareCodes.benchmarks),
   ...passes.flatMap((pass) => pass.parts.filter((p) => p.kind === 'playlist').map((p) => p.code)),
+  ...viscose.benchmarks.map((b) => b.share_code),
 ])];
+
+// Scenarios where Viscose requires a fast sens (Fingertip), by normalized name.
+const normalizeName = (name) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+const fingertipMax = new Map(viscose.benchmarks.flatMap((b) => b.scenarios
+  .filter((s) => s.max_cm360).map((s) => [normalizeName(s.name), s.max_cm360])));
 
 // The sens settings we show per run, and highlight when they change.
 const SENS_KEYS = ['sensScale', 'sens', 'dpi'];
@@ -36,7 +43,10 @@ function runsWithSens(runs) {
     const cm360 = cmPer360(run.sens, run.sensScale, run.dpi);
     const sensChanged = previous !== null && SENS_KEYS.some((key) => run[key] !== previous[key]);
     previous = run;
-    return { ...run, cm360, sensChanged };
+    // Fingertip scores are invalid in Viscose's benchmarks if played too slow.
+    const maxCm = fingertipMax.get(normalizeName(run.scenario));
+    const fingertipTooSlow = Boolean(maxCm && cm360 !== null && cm360 > maxCm);
+    return { ...run, cm360, sensChanged, fingertipTooSlow };
   });
 }
 
@@ -121,10 +131,13 @@ function buildData(database, extra, options = {}) {
     latestRun: runs[runs.length - 1] || null,
     scenarios: summaries,
     radar: stats.radarData(summaries),
+    viscose: viscose.benchmarks.map((benchmark) => {
+      return { id: benchmark.id, name: benchmark.name, ranks: benchmark.ranks, referenceRank: benchmark.reference_rank, scenarios: stats.benchmarkSummaries(runs, benchmark) };
+    }),
     sessions: stats.groupSessions(runs, config.session_gap_minutes),
     runs: [...runs].reverse(), // newest first for the log
     problems: db.allProblems(database),
-    unmatched: stats.unmatchedScenarios(runs, thresholds),
+    unmatched: stats.unmatchedScenarios(runs, [thresholds, ...viscose.benchmarks]),
     sessionLogs: logs,
     restWarning: stats.needsRestWarning(logs),
     sessionGapMinutes: config.session_gap_minutes,
