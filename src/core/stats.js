@@ -64,6 +64,7 @@ function scenarioSummaries(runs, thresholds, targets) {
       tier: scenario.tier,
       category: scenario.category,
       subcategory: scenario.subcategory,
+      retired: Boolean(scenario.retired), // removed from the benchmark in a newer season
       thresholds: scenario.thresholds,
       rankNames,
       baselineBest: scenario.baseline_best ?? null,
@@ -92,7 +93,7 @@ function unmatchedScenarios(runs, thresholds) {
 // Voltaic counts the best scenario per subcategory, so the radar does too.
 // Values are fractions of Platinum (1 = Platinum). null = no runs yet.
 function radarData(summaries) {
-  const intermediate = summaries.filter((s) => s.tier === 'Intermediate');
+  const intermediate = summaries.filter((s) => s.tier === 'Intermediate' && !s.retired);
   return SUBCATEGORIES.map((subcategory) => {
     const pair = intermediate.filter((s) => s.subcategory === subcategory);
     const pick = (valueOf) => {

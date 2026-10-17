@@ -250,3 +250,31 @@ details[open] summary { margin-bottom: 10px; }
 .session .when b { display: block; font-size: 15px; }
 .session .when span { font-size: 12px; color: var(--muted); }
 .session .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* ---------- Today's session (I dag) ---------- */
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.card-head h2 { margin: 0; }
+.steps { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.step { flex: 1; min-width: 92px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.step b { display: block; font-size: 15px; }
+.step span { font-size: 12px; color: var(--text-2); }
+.pl { padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.015); }
+.pl + .pl { margin-top: 12px; }
+.pl-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pl-head .name { font-weight: 600; }
+.pl-head code { font: 12px "Cascadia Mono", Consolas, monospace; color: var(--muted); }
+.pl-buttons { display: flex; gap: 6px; }
+.pl-progress { display: flex; align-items: center; gap: 14px; margin: 12px 0; }
+.pl-progress .progress { flex: 1; }
+.pl .alert { margin-bottom: 12px; }
+.checklist { list-style: none; margin: 0; padding: 0; columns: 2 320px; column-gap: 24px; }
+.checklist li { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); break-inside: avoid; font-size: 13px; }
+.checklist .tick { width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--line); display: grid; place-items: center; flex: none; }
+.checklist li.done .tick { background: var(--good); border-color: transparent; color: #fff; }
+.checklist li.done .sc { color: var(--muted); }
+.checklist li.next { color: var(--text); font-weight: 600; }
+.checklist li.next .tick { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.checklist .sc { flex: 1; min-width: 0; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.checklist .sc:hover { color: var(--accent); text-decoration: underline; }
+.checklist .cnt { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 12px; }
+.checklist .cnt small { color: var(--good); }

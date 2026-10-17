@@ -24,6 +24,13 @@ function scenarioRow(s, target) {
     </tr>`;
 }
 
+// Scenarios removed in S5.5 (DriftTS). Shown at the bottom so old runs stay visible.
+function retiredRows(rows, target) {
+  const retired = rows.filter((s) => s.retired);
+  if (!retired.length) return '';
+  return `<tr class="group"><td colspan="6">Udgået i S5.5</td></tr>${retired.map((s) => scenarioRow(s, target)).join('')}`;
+}
+
 // Challenge runs of one scenario, oldest first (data.runs is newest first).
 function scenarioRuns(data, name) {
   return data.runs
@@ -32,7 +39,6 @@ function scenarioRuns(data, name) {
 }
 
 function detailPanel(s, runs) {
-
   const ladder = s.thresholds.map((t, i) => `
     <div class="${s.best !== null && s.best >= t ? 'reached' : ''}">
       <span>${esc(s.rankNames[i])}</span><b>${num(t)}</b>
@@ -53,8 +59,9 @@ function detailPanel(s, runs) {
       <div>
         <div class="secondary small">${esc(s.tier)} · ${esc(s.category)} / ${esc(s.subcategory)}</div>
         <h2>${esc(s.name)}</h2>
-        ${rankBadge(s.rank)} ${s.nextRank ? `<span class="pill">Næste: ${esc(s.nextRank)} ${num(s.nextThreshold)}</span>` : ''}
+        ${s.retired ? '<span class="pill">Udgået i S5.5</span> ' : ''}${rankBadge(s.rank)} ${s.nextRank ? `<span class="pill">Næste: ${esc(s.nextRank)} ${num(s.nextThreshold)}</span>` : ''}
       </div>
+      <div><button class="btn small" data-open-scenario="${esc(s.name)}">${icon('bolt', 15)}Spil i KovaaK's</button></div>
       <div class="kpis">
         <div class="kpi"><span>Bedst</span><b>${num(s.best, 1)}</b></div>
         <div class="kpi"><span>Median 3</span><b>${num(s.medianLast3, 1)}</b></div>
@@ -80,9 +87,9 @@ function renderScenarios(data) {
   const target = currentTargetKey(data.today.weekInfo);
 
   const body = CATEGORY_ORDER.map((category) => {
-    const inCategory = rows.filter((s) => s.category === category);
+    const inCategory = rows.filter((s) => s.category === category && !s.retired);
     return `<tr class="group"><td colspan="6">${category}</td></tr>${inCategory.map((s) => scenarioRow(s, target)).join('')}`;
-  }).join('');
+  }).join('') + retiredRows(rows, target);
 
   const unmatched = data.unmatched.length
     ? `<table><tr><th>Navn i dine filer</th><th class="num">Runs</th></tr>
@@ -94,7 +101,7 @@ function renderScenarios(data) {
 
   const page = document.getElementById('page-scenarios');
   page.innerHTML = `
-    ${pageHead('Scenarier', 'Voltaic S5. Kun Challenge-runs tæller. Grå bjælke = fra din baseline, indtil du har spillet scenariet.', tierSwitch)}
+    ${pageHead('Scenarier', 'Voltaic S5.5. Kun Challenge-runs tæller. Grå bjælke = fra din baseline, indtil du har spillet scenariet.', tierSwitch)}
     <div class="cols cols-split">
       <div class="stack">
         <div class="card table-wrap">
@@ -105,7 +112,7 @@ function renderScenarios(data) {
         </div>
         <details class="card">
           <summary>Scenarier uden match (${data.unmatched.length})</summary>
-          <p class="muted small">Navne fra dine filer, som ikke står i Voltaic-listen. Appen gætter ikke. Står et Voltaic-scenarie her, er navnet anderledes (fx S5.5 i stedet for S5).</p>
+          <p class="muted small">Navne fra dine filer, som ikke står i Voltaic-listen. Appen gætter ikke. VDIM- og træningsscenarier lander her, og det er helt normalt.</p>
           ${unmatched}
         </details>
       </div>
@@ -121,6 +128,9 @@ function renderScenarios(data) {
     selectedScenario = tr.dataset.name;
     renderScenarios(data);
   }));
+
+  page.querySelectorAll('[data-open-scenario]').forEach((el) => el.addEventListener('click', () =>
+    window.api.openInKovaaks({ type: 'scenario', name: el.dataset.openScenario })));
 
   if (runs.length) drawTrend('trend-chart', runs, selected);
 }

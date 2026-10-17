@@ -1,4 +1,5 @@
-// "I dag": where you are in the plan, today's routine, status and the session form.
+// "I dag": where you are in the plan, today's session (playlist checklist),
+// status tiles and the post-session form.
 
 // What you have typed in the form so far. The page redraws when a new run
 // arrives, and this keeps your input from disappearing when that happens.
@@ -42,11 +43,10 @@ function weekHero(data) {
 
 function statusTiles(data) {
   const latest = data.latestRun;
-  const settingsTile = !latest
-    ? { cls: '', ico: 'bolt', value: 'Ingen runs', sub: 'Spil et scenarie i KovaaK\'s' }
-    : latest.warnings.length
-      ? { cls: 'warning', ico: 'alert', value: `${latest.warnings.length} problem${latest.warnings.length > 1 ? 'er' : ''}`, sub: `Seneste run: ${esc(latest.scenario)}` }
-      : { cls: 'good', ico: 'check', value: 'Passer med planen', sub: `Seneste run: ${esc(latest.scenario)}` };
+  const sensTile = latest
+    ? { ico: 'target', value: latest.cm360 === null ? `Sens ${num(latest.sens, 2)}` : `${num(latest.cm360, 1)} cm/360`,
+        sub: `${esc(latest.sensScale)} ${num(latest.sens, 2)} · ${num(latest.dpi)} DPI (seneste run)` }
+    : { ico: 'target', value: 'Ingen runs', sub: 'Spil et scenarie i KovaaK\'s' };
 
   const session = data.sessions[0];
   const sessionTile = session
@@ -58,7 +58,7 @@ function statusTiles(data) {
     ? { cls: 'critical', ico: 'alert', value: 'Hvil!', sub: 'Smerte 5+ to sessioner i træk' }
     : lastLog
       ? { cls: lastLog.pain >= 5 ? 'warning' : 'good', ico: 'heart', value: `Smerte ${lastLog.pain}/10`, sub: `Spænding ${lastLog.tension}/5 sidst` }
-      : { cls: '', ico: 'heart', value: 'Ingen log', sub: 'Udfyld formularen efter træning' };
+      : { ico: 'heart', value: 'Ingen log', sub: 'Udfyld formularen efter træning' };
 
   const tile = (label, t, ico) => `
     <div class="card tile ${t.cls || ''}">
@@ -67,26 +67,81 @@ function statusTiles(data) {
     </div>`;
 
   return `<div class="cols cols-3">
-    ${tile('Indstillinger', settingsTile, 'bolt')}
+    ${tile('Sens', sensTile, 'target')}
     ${tile('Seneste session', sessionTile, 'clock')}
     ${tile('Krop', bodyTile, 'heart')}
   </div>`;
 }
 
-function shareCodes(t) {
-  if (!t.codes.length) return '<div class="empty">Ingen share code i dag. Hviledag eller udenfor planen.</div>';
-  return t.codes.map((c) => `
-    <div class="code-card">
-      <div><div class="name">${esc(c.name)}</div><code>${esc(c.code)}</code></div>
-      <button class="btn ghost small" data-copy="${esc(c.code)}">${icon('copy', 15)}<span>Kopiér</span></button>
-    </div>`).join('');
+// One playlist of today: header with buttons, progress and the scenario checklist.
+function playlistBlock(block, playlistStatus) {
+  const buttons = `
+    <button class="btn small" data-open-playlist="${esc(block.code)}">${icon('bolt', 15)}Åbn i KovaaK's</button>
+    <button class="btn ghost small" data-copy="${esc(block.code)}">${icon('copy', 15)}<span>Kopiér kode</span></button>`;
+
+  const head = `
+    <div class="pl-head">
+      <div><div class="name">${esc(block.name)}</div><code>${esc(block.code)}</code></div>
+      <div class="pl-buttons">${buttons}</div>
+    </div>`;
+
+  if (!block.progress) {
+    const text = playlistStatus.error ? esc(playlistStatus.text) : 'Henter playlistens indhold fra kovaaks.com...';
+    return `<div class="pl">${head}<p class="muted small">${text}</p></div>`;
+  }
+
+  const p = block.progress;
+  const items = p.items.map((item) => {
+    const state = item.done >= item.need ? 'done' : item.name === p.nextName ? 'next' : '';
+    return `
+      <li class="${state}">
+        <span class="tick">${state === 'done' ? icon('check', 14) : ''}</span>
+        <span class="sc" title="Åbn i KovaaK's" data-open-scenario="${esc(item.name)}">${esc(item.name)}</span>
+        <span class="cnt">${item.done}/${item.need}${item.extra ? ` <small>+${item.extra}</small>` : ''}</span>
+      </li>`;
+  }).join('');
+
+  return `
+    <div class="pl">
+      ${head}
+      <div class="pl-progress">
+        ${progressBar(p.totalDone / p.totalNeed)}
+        <span class="secondary small">${p.totalDone} af ${p.totalNeed} runs · ca. ${p.estimatedMinutes} min</span>
+      </div>
+      ${p.complete ? `<div class="alert good">${icon('check')}<div><b>Gennemført!</b> Alle runs i ${esc(block.playlistName)} er spillet i dag.</div></div>` : ''}
+      <ol class="checklist">${items}</ol>
+    </div>`;
+}
+
+function todaysSession(data) {
+  const s = data.session;
+  if (!s.blocks.length) {
+    return `<div class="card"><h2>Dagens pas</h2><div class="empty">Ingen træning i dag. Hviledag eller udenfor planen.</div></div>`;
+  }
+
+  const steps = s.steps.length
+    ? `<div class="steps">${s.steps.map((step) => `
+        <div class="step" title="${esc(step.text)}"><b>${step.minutes} min</b><span>${esc(step.name)}</span></div>`).join('')}
+      </div>`
+    : '';
+
+  return `
+    <div class="card">
+      <div class="card-head">
+        <h2>Dagens pas</h2>
+        ${s.totalMinutes ? `<span class="pill">${icon('clock')}ca. ${s.totalMinutes} min i alt</span>` : ''}
+      </div>
+      ${steps}
+      ${s.blocks.map((b) => playlistBlock(b, data.playlistStatus)).join('')}
+      <p class="muted small">Klik på et scenarie for at åbne det i KovaaK's. Kun Challenge-runs fra i dag tæller. VDIM skal spilles i rækkefølge.</p>
+    </div>`;
 }
 
 // The Intermediate scenarios closest to their next rank. Uses your best run,
 // or the baseline from the screenshots if you haven't played it yet.
 function closestToRank(data) {
   const rows = data.scenarios
-    .filter((s) => s.tier === 'Intermediate')
+    .filter((s) => s.tier === 'Intermediate' && !s.retired)
     .map((s) => {
       const fromRuns = s.best !== null;
       const info = fromRuns ? s : rankFor(s.baselineBest, s);
@@ -141,14 +196,9 @@ function sessionForm() {
 }
 
 function renderToday(data) {
-  const latest = data.latestRun;
   const rest = data.restWarning
     ? `<div class="alert critical">${icon('alert')}<div><b>Hvil!</b> Smerte 5 eller mere i to sessioner i træk.
        Planen siger: stop ved smerte og tag deload med det samme. Vedvarende symptomer skal ses af en fysioterapeut.</div></div>`
-    : '';
-  const settingsAlert = latest && latest.warnings.length
-    ? `<div class="alert warning">${icon('alert')}<div><b>Seneste run (${esc(latest.scenario)}, ${dateTime(latest.playedAt)}) passer ikke med planen</b>
-       <ul>${latest.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div></div>`
     : '';
 
   const page = document.getElementById('page-today');
@@ -157,12 +207,9 @@ function renderToday(data) {
       ${weekHero(data)}
       ${rest}
       ${statusTiles(data)}
-      ${settingsAlert}
+      ${todaysSession(data)}
       <div class="cols cols-2">
-        <div class="stack">
-          <div class="card"><h2>Dagens share codes</h2>${shareCodes(data.today)}</div>
-          <div class="card"><h2>Tættest på næste rank</h2>${closestToRank(data)}</div>
-        </div>
+        <div class="card"><h2>Tættest på næste rank</h2>${closestToRank(data)}</div>
         ${sessionForm()}
       </div>
     </div>`;
@@ -171,10 +218,15 @@ function renderToday(data) {
   page.querySelectorAll('[data-copy]').forEach((button) => {
     button.addEventListener('click', async () => {
       await navigator.clipboard.writeText(button.dataset.copy);
-      button.querySelector('span').textContent = 'Kopieret';
-      setTimeout(() => { button.querySelector('span').textContent = 'Kopiér'; }, 1500);
+      const label = button.querySelector('span');
+      label.textContent = 'Kopieret';
+      setTimeout(() => { label.textContent = 'Kopiér kode'; }, 1500);
     });
   });
+  page.querySelectorAll('[data-open-playlist]').forEach((el) => el.addEventListener('click', () =>
+    window.api.openInKovaaks({ type: 'playlist', code: el.dataset.openPlaylist })));
+  page.querySelectorAll('[data-open-scenario]').forEach((el) => el.addEventListener('click', () =>
+    window.api.openInKovaaks({ type: 'scenario', name: el.dataset.openScenario })));
 
   page.querySelectorAll('[data-scale]').forEach((button) => {
     button.addEventListener('click', () => {

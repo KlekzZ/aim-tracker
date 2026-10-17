@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { parseStatsFile } = require('../src/core/parser');
-const { checkRunSettings } = require('../src/core/settings-check');
+const { cmPer360 } = require('../src/core/sens');
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'config.json'), 'utf8'));
 const statsDir = process.argv[2] || config.default_stats_dir_windows;
@@ -20,9 +20,7 @@ for (const fileName of files) {
     continue;
   }
   const run = result.run;
-  const { horizontalFov, warnings } = checkRunSettings(run, config.expected_settings);
+  const cm = cmPer360(run.sens, run.sensScale, run.dpi);
   console.log(`${run.playedAt}  ${run.scenario}  [${run.mode}]  score ${run.score}`);
-  console.log(`         ${run.sensScale} ${run.sens} @ ${run.dpi} DPI, FOV ${run.fov} ${run.fovScale}, ${run.resolution}` +
-    ` -> ${horizontalFov === null ? '?' : horizontalFov.toFixed(1)}° horisontalt`);
-  for (const warning of warnings) console.log(`         ADVARSEL: ${warning}`);
+  console.log(`         ${run.sensScale} ${run.sens} @ ${run.dpi} DPI -> ${cm === null ? '?' : cm} cm/360`);
 }

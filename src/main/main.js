@@ -5,7 +5,8 @@ const path = require('node:path');
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const db = require('../core/db');
 const { importFolder } = require('../core/importer');
-const { buildData, config } = require('./data-service');
+const { buildData, config, planCodesTodayFirst } = require('./data-service');
+const kovaaks = require('./kovaaks');
 const { loadSettings, saveSettings } = require('./app-settings');
 const updater = require('./updater');
 
@@ -15,6 +16,7 @@ let settings = null;
 let watcher = null;
 let lastScan = { at: null, summary: null, error: null };
 let updateStatus = { text: '', canInstall: false };
+let playlistStatus = { text: '', error: false };
 
 function notifyPage(channel, payload) {
   if (window && !window.isDestroyed()) window.webContents.send(channel, payload);
@@ -45,6 +47,38 @@ function watchStatsFolder() {
   } catch {
     // Folder doesn't exist. scan() reports it on the page.
   }
+}
+
+// Looks up playlists on kovaaks.com and saves them. Only the codes we don't
+// have yet, unless force is true (the "Opdater playlister" button).
+async function cachePlaylists(force) {
+  const cached = db.allPlaylists(database);
+  const codes = planCodesTodayFirst().filter((code) => force || !cached[code]);
+  if (codes.length === 0) return;
+  playlistStatus = { text: `Henter ${codes.length} playlist(er) fra kovaaks.com...`, error: false };
+  notifyPage('data-changed');
+
+  // kovaaks.com takes a few seconds per lookup and times out if we ask for
+  // many at once. So two "workers" take codes from the queue one by one,
+  // and the page updates as soon as each playlist arrives.
+  const queue = [...codes];
+  const failed = [];
+  const worker = async () => {
+    while (queue.length) {
+      const code = queue.shift();
+      try {
+        db.savePlaylist(database, await kovaaks.fetchPlaylist(code));
+        notifyPage('data-changed');
+      } catch (err) {
+        failed.push(`${code} (${err.message})`);
+      }
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  playlistStatus = failed.length
+    ? { text: `Kunne ikke hente: ${failed.join(', ')}`, error: true }
+    : { text: `Hentet ${codes.length} playlist(er) fra kovaaks.com.`, error: false };
+  notifyPage('data-changed');
 }
 
 function startUpdater() {
@@ -89,6 +123,7 @@ function registerIpc() {
       appVersion: app.getVersion(),
       lastScan,
       updateStatus,
+      playlistStatus,
     })
   );
 
@@ -127,6 +162,8 @@ function registerIpc() {
   });
 
   ipcMain.handle('check-for-update', () => startUpdater());
+  ipcMain.handle('refresh-playlists', () => cachePlaylists(true));
+  ipcMain.handle('open-in-kovaaks', (_event, target) => kovaaks.openInKovaaks(target || {}));
   ipcMain.handle('install-update', () => updater.installNow());
 }
 
@@ -140,6 +177,7 @@ app.whenReady().then(async () => {
   await scan();
   watchStatsFolder();
   startUpdater();
+  cachePlaylists(false); // runs in the background; the page updates when done
 });
 
 app.on('window-all-closed', () => app.quit());

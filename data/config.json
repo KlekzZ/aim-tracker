@@ -3,11 +3,7 @@
   "language": "da",
   "plan_week1_start": "2026-10-19",
   "week0_start": "2026-10-17",
-  "deload_weeks": [
-    4,
-    8,
-    12
-  ],
+  "deload_weeks": [4, 8, 12],
   "total_weeks": 12,
   "weekly_schedule": {
     "Mon": "VDIM Adept Tracking I",
@@ -17,16 +13,6 @@
     "Fri": "Viscose day (Easier/Medium)",
     "Sat": "VDIM Adept Switching II",
     "Sun": "Rest"
-  },
-  "expected_settings": {
-    "sens_scale": "CSGO",
-    "sens": 0.85,
-    "dpi": 800,
-    "fov": 103,
-    "fov_scale": "Overwatch",
-    "aspect_ratio": "16:9",
-    "min_horizontal_fov_for_benchmarks": 103,
-    "note": "Confirmed 2026-10-17: 16:9 in KovaaK's with Overwatch FOV 103 (4:3 is only used in CS2). Early CSVs show 1280x960, which gives less than 103 horizontal."
   },
   "default_stats_dir_windows": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\FPSAimTrainer\\FPSAimTrainer\\stats",
   "session_gap_minutes": 20

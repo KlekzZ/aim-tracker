@@ -9,7 +9,6 @@ function renderSettings(data) {
          ${scan.summary.files} filer, ${scan.summary.added} nye runs, ${scan.summary.problems} problemer.</p>`
       : '';
 
-  const e = data.expectedSettings;
   document.getElementById('page-settings').innerHTML = `
     ${pageHead('Indstillinger', '')}
     <div class="cols cols-2">
@@ -24,14 +23,11 @@ function renderSettings(data) {
           ${scanText}
         </div>
         <div class="card">
-          <h2>Indstillinger fra planen</h2>
-          <div class="kpis">
-            <div class="kpi"><span>Sens</span><b>${num(e.sens, 2)} ${esc(e.sens_scale)}</b></div>
-            <div class="kpi"><span>DPI</span><b>${e.dpi}</b></div>
-            <div class="kpi"><span>FOV</span><b>${e.fov} ${esc(e.fov_scale)}</b></div>
-            <div class="kpi"><span>Opløsning</span><b>${esc(e.aspect_ratio)}</b></div>
-          </div>
-          <p class="muted small">Benchmarks kræver mindst ${e.min_horizontal_fov_for_benchmarks}° horisontal FOV. Ændres i data/config.json.</p>
+          <h2>KovaaK's playlister</h2>
+          <p class="muted small">Appen slår playlisternes indhold op på kovaaks.com ud fra share coden (scenarier og antal runs)
+            og gemmer dem lokalt. Den spørger kun igen, hvis du trykker her. Der sendes ingen data om dig.</p>
+          <button class="btn ghost" id="refresh-playlists">${icon('refresh', 16)}Opdater playlister</button>
+          ${data.playlistStatus.text ? `<p class="${data.playlistStatus.error ? 'changed' : 'secondary'} small">${esc(data.playlistStatus.text)}</p>` : ''}
         </div>
       </div>
       <div class="card">
@@ -39,7 +35,7 @@ function renderSettings(data) {
         <p>Version <b>${esc(data.appVersion)}</b></p>
         <label class="toggle"><input type="checkbox" id="auto-update" ${data.autoUpdate ? 'checked' : ''}>
           Søg automatisk efter nye versioner på GitHub</label>
-        <p class="muted small">Det er det eneste, appen bruger internettet til. Der sendes ingen data.</p>
+        <p class="muted small">Appen bruger kun internettet til det her og til at slå playlister op. Der sendes ingen data om dig.</p>
         <p id="update-status" class="secondary">${esc(data.updateStatus.text)}</p>
         <button class="btn ghost" id="check-update">${icon('refresh', 16)}Søg nu</button>
         <button class="btn" id="install-update" ${data.updateStatus.canInstall ? '' : 'hidden'}>${icon('download', 16)}Genstart og opdater</button>
@@ -48,6 +44,7 @@ function renderSettings(data) {
 
   document.getElementById('choose-dir').addEventListener('click', () => window.api.chooseStatsDir());
   document.getElementById('rescan').addEventListener('click', () => window.api.rescan());
+  document.getElementById('refresh-playlists').addEventListener('click', () => window.api.refreshPlaylists());
   document.getElementById('auto-update').addEventListener('change', (ev) => window.api.setAutoUpdate(ev.target.checked));
   document.getElementById('check-update').addEventListener('click', () => window.api.checkForUpdate());
   document.getElementById('install-update').addEventListener('click', () => window.api.installUpdate());

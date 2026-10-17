@@ -1,8 +1,8 @@
 {
   "name": "aim-tracker",
   "productName": "Aim Tracker",
-  "version": "0.2.0",
-  "description": "Local, read-only KovaaK's progress tracker for a 12-week aim training plan",
+  "version": "0.3.0",
+  "description": "Local KovaaK's aim training journal and plan tracker",
   "author": "KlekzZ",
   "license": "UNLICENSED",
   "main": "src/main/main.js",

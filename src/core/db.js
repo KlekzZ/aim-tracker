@@ -34,6 +34,15 @@ const SCHEMA = `
     reason TEXT NOT NULL
   );
 
+  -- Playlists looked up on kovaaks.com, saved so the app works offline.
+  -- scenarios is JSON: [{ "name": "...", "playCount": 2 }, ...]
+  CREATE TABLE IF NOT EXISTS playlists (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    scenarios TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+  );
+
   -- The post-session form.
   CREATE TABLE IF NOT EXISTS session_logs (
     id INTEGER PRIMARY KEY,
@@ -105,6 +114,21 @@ function allProblems(db) {
   return db.prepare('SELECT * FROM problems ORDER BY file_name').all();
 }
 
+function savePlaylist(db, playlist) {
+  db.prepare(
+    'INSERT OR REPLACE INTO playlists (code, name, scenarios, fetched_at) VALUES (?, ?, ?, ?)'
+  ).run(playlist.code, playlist.name, JSON.stringify(playlist.scenarios), new Date().toISOString());
+}
+
+// All cached playlists as { code: { code, name, scenarios, fetchedAt } }.
+function allPlaylists(db) {
+  const result = {};
+  for (const row of db.prepare('SELECT * FROM playlists').all()) {
+    result[row.code] = { code: row.code, name: row.name, scenarios: JSON.parse(row.scenarios), fetchedAt: row.fetched_at };
+  }
+  return result;
+}
+
 function addSessionLog(db, entry) {
   db.prepare(
     'INSERT INTO session_logs (created_at, focus_cue, tension, pain, note) VALUES (?, ?, ?, ?, ?)'
@@ -125,6 +149,8 @@ module.exports = {
   insertRun,
   allRuns,
   allProblems,
+  savePlaylist,
+  allPlaylists,
   addSessionLog,
   sessionLogs,
 };

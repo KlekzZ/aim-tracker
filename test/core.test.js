@@ -1,44 +1,48 @@
-// Tests for FOV math, settings warnings, plan weeks, sessions and ranks.
+// Tests for cm/360, playlist progress, S5.5 data, plan weeks, sessions and ranks.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { horizontalFov } = require('../src/core/fov');
-const { checkRunSettings } = require('../src/core/settings-check');
+const { cmPer360 } = require('../src/core/sens');
+const { playlistProgress } = require('../src/core/playlist-progress');
 const plan = require('../src/core/plan');
 const stats = require('../src/core/stats');
 
 const root = path.join(__dirname, '..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'data', 'config.json'), 'utf8'));
+const thresholds = JSON.parse(fs.readFileSync(path.join(root, 'data', 'voltaic_s5_5_thresholds.json'), 'utf8'));
 const planText = fs.readFileSync(path.join(root, 'docs', 'training-program.md'), 'utf8');
 
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 0.1, `${actual} != ${expected}`);
 
-test('FOV: CS 90 on 4:3 is 90, on 16:9 it is 106.26', () => {
-  near(horizontalFov(90, 'CSGO', 1280, 960), 90);
-  near(horizontalFov(90, 'CSGO', 1920, 1080), 106.26);
+test('cm/360: CSGO 0.85 at 800 DPI is 61.1 cm (as in the plan)', () => {
+  near(cmPer360(0.85, 'CSGO', 800), 61.1);
+  near(cmPer360(1.3, 'CSGO', 800), 40);
 });
 
-test('FOV: Overwatch 103 is 103 on 16:9 but only ~86.6 on 4:3', () => {
-  near(horizontalFov(103, 'Overwatch', 1920, 1080), 103);
-  near(horizontalFov(103, 'Overwatch', 1280, 960), 86.6);
+test('cm/360: cm/360 scale is used as-is, unknown scale gives null', () => {
+  assert.equal(cmPer360(45, 'cm/360', 800), 45);
+  assert.equal(cmPer360(1, 'SomethingNew', 800), null);
 });
 
-test('FOV: unknown scale returns null instead of guessing', () => {
-  assert.equal(horizontalFov(103, 'SomethingNew', 1920, 1080), null);
+test('playlist progress: counts today\'s Challenge runs per scenario', () => {
+  const playlist = { scenarios: [{ name: 'A', playCount: 2 }, { name: 'B', playCount: 1 }] };
+  const run = (scenario, mode = 'Challenge') => ({ scenario, mode });
+  const half = playlistProgress(playlist, [run('A'), run('a '), run('B', 'Freeplay')]);
+  assert.equal(half.totalDone, 2);
+  assert.equal(half.complete, false);
+  assert.equal(half.nextName, 'B');
+  const done = playlistProgress(playlist, [run('A'), run('A'), run('A'), run('B')]);
+  assert.equal(done.complete, true);
+  assert.equal(done.items[0].extra, 1);
 });
 
-const goodRun = { sensScale: 'CSGO', sens: 0.85, dpi: 800, fov: 103, fovScale: 'Overwatch', resolution: '1920x1080', width: 1920, height: 1080 };
-
-test('settings: the planned setup gives no warnings', () => {
-  assert.deepEqual(checkRunSettings(goodRun, config.expected_settings).warnings, []);
-});
-
-test('settings: the sample setup (1280x960, CS FOV 90) is flagged', () => {
-  const run = { ...goodRun, fov: 90, fovScale: 'CSGO', resolution: '1280x960', width: 1280, height: 960 };
-  const { warnings } = checkRunSettings(run, config.expected_settings);
-  assert.ok(warnings.some((w) => w.includes('4:3')));
-  assert.ok(warnings.some((w) => w.includes('Horisontal FOV')));
+test('S5.5: 21 active scenarios per tier, DriftTS retired and left out of the radar', () => {
+  const active = thresholds.scenarios.filter((s) => s.tier === 'Intermediate' && !s.retired);
+  assert.equal(active.length, 21);
+  const summaries = stats.scenarioSummaries([{ scenario: 'VT DriftTS Intermediate S5', mode: 'Challenge', score: 999 }], thresholds, []);
+  const evasive = stats.radarData(summaries).find((r) => r.subcategory === 'Evasive');
+  assert.equal(evasive.current, null); // the DriftTS run doesn't count
 });
 
 test('plan: week numbers, deload and Clicking I/II', () => {

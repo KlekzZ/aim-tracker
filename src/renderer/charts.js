@@ -127,7 +127,16 @@ function drawTrend(canvasId, runs, summary) {
       },
       plugins: {
         legend: { display: false }, // one series; the title names it
-        tooltip: { filter: (item) => item.datasetIndex === 0 },
+        tooltip: {
+          filter: (item) => item.datasetIndex === 0,
+          // Show the sens used, so you can see if a score came on another sens.
+          callbacks: {
+            afterLabel: (item) => {
+              const cm = runs[item.dataIndex].cm360;
+              return cm === null || cm === undefined ? '' : `${num(cm, 1)} cm/360`;
+            },
+          },
+        },
       },
     },
     plugins: [thresholdLabels],
