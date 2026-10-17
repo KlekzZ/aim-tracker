@@ -1,0 +1,53 @@
+{
+  "name": "aim-tracker",
+  "productName": "Aim Tracker",
+  "version": "0.1.0",
+  "description": "Local, read-only KovaaK's progress tracker for a 12-week aim training plan",
+  "author": "KlekzZ",
+  "license": "UNLICENSED",
+  "main": "src/main/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KlekzZ/aim-tracker.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "scan": "node scripts/scan.js",
+    "dist": "electron-builder --win --publish never",
+    "release": "electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "com.klekzz.aimtracker",
+    "productName": "Aim Tracker",
+    "files": [
+      "src/**",
+      "data/**",
+      "docs/training-program.md",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "KlekzZ",
+        "repo": "aim-tracker",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "chart.js": "^4.5.1",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  }
+}

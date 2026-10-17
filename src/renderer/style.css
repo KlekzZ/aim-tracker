@@ -1,0 +1,116 @@
+/* Colors are named by their job, so light and dark mode swap in one place. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --series-1: #2a78d6; /* your runs */
+  --series-2: #eb6834; /* baseline from the screenshots */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --good-text: #006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text: #ffffff;
+    --text-2: #c3c2b7;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --good-text: #0ca30c;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 14px/1.45 system-ui, "Segoe UI", sans-serif;
+}
+header {
+  display: flex; align-items: center; gap: 24px;
+  padding: 10px 20px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 1;
+}
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 18px; margin: 0 0 12px; }
+h3 { font-size: 15px; margin: 0 0 8px; }
+nav { display: flex; gap: 4px; }
+nav button {
+  background: none; border: 0; padding: 6px 12px; border-radius: 6px;
+  color: var(--text-2); font: inherit; cursor: pointer;
+}
+nav button:hover { background: var(--border); }
+nav button.active { color: var(--text); background: var(--border); font-weight: 600; }
+
+main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+.page { display: none; }
+.page.active { display: block; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; margin-bottom: 16px;
+}
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.grid > .card { margin-bottom: 0; }
+.muted { color: var(--muted); }
+.secondary { color: var(--text-2); }
+.big { font-size: 22px; font-weight: 600; }
+
+/* Status boxes always have an icon and text, never color alone. */
+.alert { border-left: 4px solid; padding: 10px 12px; border-radius: 6px; margin: 0 0 12px; background: var(--surface); }
+.alert.critical { border-color: var(--critical); }
+.alert.warning { border-color: var(--warning); }
+.alert.good { border-color: var(--good); }
+.alert ul { margin: 4px 0 0; padding-left: 20px; }
+
+.code-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 10px 0; }
+.code-row > span { width: 100%; color: var(--text-2); }
+code { font-family: Consolas, monospace; background: var(--border); padding: 2px 6px; border-radius: 4px; }
+
+button.action, input[type=submit] {
+  background: var(--series-1); color: #fff; border: 0; border-radius: 6px;
+  padding: 6px 12px; font: inherit; cursor: pointer;
+}
+button.action.secondary-btn { background: var(--border); color: var(--text); }
+
+form label { display: block; margin: 8px 0 4px; color: var(--text-2); }
+form input[type=text], form textarea, form select {
+  width: 100%; padding: 6px 8px; font: inherit; color: var(--text);
+  background: var(--page); border: 1px solid var(--border); border-radius: 6px;
+}
+form .row { display: flex; gap: 12px; }
+form .row > div { flex: 1; }
+form input[type=submit] { margin-top: 12px; }
+
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--text-2); font-weight: 600; vertical-align: bottom; }
+td.num, th.num { text-align: right; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover, tr.selected { background: var(--border); }
+td.changed { outline: 2px solid var(--warning); outline-offset: -2px; }
+.table-wrap { overflow-x: auto; }
+
+/* Progress bar toward the next rank. */
+.bar { width: 90px; height: 8px; background: var(--grid); border-radius: 4px; display: inline-block; vertical-align: middle; }
+.bar > span { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
+
+.filters { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+.filters h2 { margin: 0 8px 0 0; }
+.chart-box { position: relative; height: 360px; }
+.chart-box.radar { height: 460px; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; background: var(--border); font-size: 12px; }

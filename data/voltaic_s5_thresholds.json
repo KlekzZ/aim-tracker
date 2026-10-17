@@ -1,0 +1,485 @@
+{
+  "_note": "Transcribed by Claude from the user's evxl.app screenshots (Voltaic Season 5, not 5.5). Scenario names are the in-game names; verify against real CSV 'Scenario:' values and log mismatches. Scores are the user's best scores at the time of the screenshots (around Oct 2026 baseline, before the 12-week plan).",
+  "novice_ranks": [
+    "Iron",
+    "Bronze",
+    "Silver",
+    "Gold"
+  ],
+  "intermediate_ranks": [
+    "Platinum",
+    "Diamond",
+    "Jade",
+    "Master"
+  ],
+  "scenarios": [
+    {
+      "name": "VT Pasu Novice S5",
+      "tier": "Novice",
+      "category": "Clicking",
+      "subcategory": "Dynamic",
+      "thresholds": [
+        555,
+        660,
+        745,
+        800
+      ],
+      "baseline_best": 874.15
+    },
+    {
+      "name": "VT Pasu Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Clicking",
+      "subcategory": "Dynamic",
+      "thresholds": [
+        770,
+        850,
+        930,
+        980
+      ],
+      "baseline_best": 684.6
+    },
+    {
+      "name": "VT Popcorn Novice S5",
+      "tier": "Novice",
+      "category": "Clicking",
+      "subcategory": "Dynamic",
+      "thresholds": [
+        390,
+        500,
+        600,
+        720
+      ],
+      "baseline_best": 770
+    },
+    {
+      "name": "VT Popcorn Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Clicking",
+      "subcategory": "Dynamic",
+      "thresholds": [
+        600,
+        690,
+        780,
+        860
+      ],
+      "baseline_best": 560
+    },
+    {
+      "name": "VT 1w4ts Novice S5",
+      "tier": "Novice",
+      "category": "Clicking",
+      "subcategory": "Static",
+      "thresholds": [
+        820,
+        915,
+        1010,
+        1110
+      ],
+      "baseline_best": 1124.9
+    },
+    {
+      "name": "VT 1w3ts Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Clicking",
+      "subcategory": "Static",
+      "thresholds": [
+        1120,
+        1220,
+        1300,
+        1380
+      ],
+      "baseline_best": 954.86
+    },
+    {
+      "name": "VT ww5t Novice S5",
+      "tier": "Novice",
+      "category": "Clicking",
+      "subcategory": "Static",
+      "thresholds": [
+        990,
+        1090,
+        1190,
+        1290
+      ],
+      "baseline_best": 1340
+    },
+    {
+      "name": "VT ww5t Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Clicking",
+      "subcategory": "Static",
+      "thresholds": [
+        1310,
+        1400,
+        1490,
+        1560
+      ],
+      "baseline_best": 1140
+    },
+    {
+      "name": "VT Frogtagon Novice S5",
+      "tier": "Novice",
+      "category": "Clicking",
+      "subcategory": "Linear",
+      "thresholds": [
+        620,
+        740,
+        850,
+        980
+      ],
+      "baseline_best": 1050
+    },
+    {
+      "name": "VT Frogtagon Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Clicking",
+      "subcategory": "Linear",
+      "thresholds": [
+        940,
+        1040,
+        1140,
+        1230
+      ],
+      "baseline_best": 920
+    },
+    {
+      "name": "VT Floating Heads Novice S5",
+      "tier": "Novice",
+      "category": "Clicking",
+      "subcategory": "Linear",
+      "thresholds": [
+        375,
+        460,
+        540,
+        640
+      ],
+      "baseline_best": 831.95
+    },
+    {
+      "name": "VT Floating Heads Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Clicking",
+      "subcategory": "Linear",
+      "thresholds": [
+        610,
+        690,
+        770,
+        860
+      ],
+      "baseline_best": 509.45
+    },
+    {
+      "name": "VT PGT Novice S5",
+      "tier": "Novice",
+      "category": "Tracking",
+      "subcategory": "Precise",
+      "thresholds": [
+        1900,
+        2325,
+        2775,
+        3050
+      ],
+      "baseline_best": 3289
+    },
+    {
+      "name": "VT PGT Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Tracking",
+      "subcategory": "Precise",
+      "thresholds": [
+        2275,
+        2675,
+        3050,
+        3325
+      ],
+      "baseline_best": 1799
+    },
+    {
+      "name": "VT Snake Track Novice S5",
+      "tier": "Novice",
+      "category": "Tracking",
+      "subcategory": "Precise",
+      "thresholds": [
+        2400,
+        2750,
+        3125,
+        3425
+      ],
+      "baseline_best": 3768
+    },
+    {
+      "name": "VT Snake Track Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Tracking",
+      "subcategory": "Precise",
+      "thresholds": [
+        2800,
+        3175,
+        3500,
+        3750
+      ],
+      "baseline_best": 2438
+    },
+    {
+      "name": "VT Aether Novice S5",
+      "tier": "Novice",
+      "category": "Tracking",
+      "subcategory": "Reactive",
+      "thresholds": [
+        1525,
+        1900,
+        2250,
+        2650
+      ],
+      "baseline_best": 2654
+    },
+    {
+      "name": "VT Aether Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Tracking",
+      "subcategory": "Reactive",
+      "thresholds": [
+        2175,
+        2550,
+        2900,
+        3175
+      ],
+      "baseline_best": 1623
+    },
+    {
+      "name": "VT Ground Novice S5",
+      "tier": "Novice",
+      "category": "Tracking",
+      "subcategory": "Reactive",
+      "thresholds": [
+        2100,
+        2500,
+        2825,
+        3100
+      ],
+      "baseline_best": 3338
+    },
+    {
+      "name": "VT Ground Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Tracking",
+      "subcategory": "Reactive",
+      "thresholds": [
+        2550,
+        2850,
+        3100,
+        3350
+      ],
+      "baseline_best": 2214
+    },
+    {
+      "name": "VT Raw Control Novice S5",
+      "tier": "Novice",
+      "category": "Tracking",
+      "subcategory": "Control",
+      "thresholds": [
+        2125,
+        2550,
+        2975,
+        3450
+      ],
+      "baseline_best": 3656
+    },
+    {
+      "name": "VT Raw Control Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Tracking",
+      "subcategory": "Control",
+      "thresholds": [
+        2775,
+        3200,
+        3550,
+        3875
+      ],
+      "baseline_best": 2303
+    },
+    {
+      "name": "VT Controlsphere Novice S5",
+      "tier": "Novice",
+      "category": "Tracking",
+      "subcategory": "Control",
+      "thresholds": [
+        1575,
+        1950,
+        2400,
+        2900
+      ],
+      "baseline_best": 2943
+    },
+    {
+      "name": "VT Controlsphere Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Tracking",
+      "subcategory": "Control",
+      "thresholds": [
+        2750,
+        3175,
+        3525,
+        3825
+      ],
+      "baseline_best": 1986
+    },
+    {
+      "name": "VT DotTS Novice S5",
+      "tier": "Novice",
+      "category": "Switching",
+      "subcategory": "Speed",
+      "thresholds": [
+        845,
+        940,
+        1030,
+        1090
+      ],
+      "baseline_best": 1149
+    },
+    {
+      "name": "VT DotTS Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Switching",
+      "subcategory": "Speed",
+      "thresholds": [
+        1110,
+        1180,
+        1230,
+        1280
+      ],
+      "baseline_best": 1047
+    },
+    {
+      "name": "VT EddieTS Novice S5",
+      "tier": "Novice",
+      "category": "Switching",
+      "subcategory": "Speed",
+      "thresholds": [
+        640,
+        730,
+        810,
+        890
+      ],
+      "baseline_best": 943.5
+    },
+    {
+      "name": "VT EddieTS Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Switching",
+      "subcategory": "Speed",
+      "thresholds": [
+        880,
+        950,
+        1020,
+        1080
+      ],
+      "baseline_best": 900
+    },
+    {
+      "name": "VT DriftTS Novice S5",
+      "tier": "Novice",
+      "category": "Switching",
+      "subcategory": "Evasive",
+      "thresholds": [
+        315,
+        355,
+        390,
+        430
+      ],
+      "baseline_best": 430
+    },
+    {
+      "name": "VT DriftTS Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Switching",
+      "subcategory": "Evasive",
+      "thresholds": [
+        390,
+        430,
+        460,
+        490
+      ],
+      "baseline_best": 300.4
+    },
+    {
+      "name": "VT FlyTS Novice S5",
+      "tier": "Novice",
+      "category": "Switching",
+      "subcategory": "Evasive",
+      "thresholds": [
+        420,
+        460,
+        500,
+        535
+      ],
+      "baseline_best": 559.6
+    },
+    {
+      "name": "VT FlyTS Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Switching",
+      "subcategory": "Evasive",
+      "thresholds": [
+        520,
+        570,
+        610,
+        650
+      ],
+      "baseline_best": 483
+    },
+    {
+      "name": "VT ControlTS Novice S5",
+      "tier": "Novice",
+      "category": "Switching",
+      "subcategory": "Stability",
+      "thresholds": [
+        340,
+        380,
+        420,
+        450
+      ],
+      "baseline_best": 459.4
+    },
+    {
+      "name": "VT ControlTS Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Switching",
+      "subcategory": "Stability",
+      "thresholds": [
+        420,
+        460,
+        485,
+        520
+      ],
+      "baseline_best": 391.6
+    },
+    {
+      "name": "VT Penta Bounce Novice S5",
+      "tier": "Novice",
+      "category": "Switching",
+      "subcategory": "Stability",
+      "thresholds": [
+        290,
+        340,
+        390,
+        445
+      ],
+      "baseline_best": 499.8
+    },
+    {
+      "name": "VT Penta Bounce Intermediate S5",
+      "tier": "Intermediate",
+      "category": "Switching",
+      "subcategory": "Stability",
+      "thresholds": [
+        450,
+        490,
+        540,
+        580
+      ],
+      "baseline_best": 370.6
+    }
+  ]
+}

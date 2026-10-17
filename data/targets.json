@@ -1,0 +1,20 @@
+{
+  "_note": "Copied by hand from the 'Scoremål (S5 Intermediate)' table in docs/training-program.md. Check these. A number is a score target, text is a target that is not a number (e.g. 'holde' = hold your level). 'now' is the score in the plan when it was written.",
+  "targets": [
+    { "scenario": "VT Raw Control Intermediate S5", "now": 2303, "week4": 2550, "week8": 2775, "week12": 2900 },
+    { "scenario": "VT Controlsphere Intermediate S5", "now": 1986, "week4": 2200, "week8": 2350, "week12": 2475 },
+    { "scenario": "VT Ground Intermediate S5", "now": 2214, "week4": 2400, "week8": 2550, "week12": 2650 },
+    { "scenario": "VT Aether Intermediate S5", "now": 1623, "week4": 1800, "week8": 1900, "week12": 1960 },
+    { "scenario": "VT Snake Track Intermediate S5", "now": 2438, "week4": 2650, "week8": 2800, "week12": 2900 },
+    { "scenario": "VT PGT Intermediate S5", "now": 1799, "week4": 1950, "week8": 2050, "week12": 2050 },
+    { "scenario": "VT ww5t Intermediate S5", "now": 1140, "week4": 1180, "week8": 1310, "week12": 1350 },
+    { "scenario": "VT FlyTS Intermediate S5", "now": 483, "week4": 495, "week8": 520, "week12": 540 },
+    { "scenario": "VT DriftTS Intermediate S5", "now": 300.4, "week4": 315, "week8": 340, "week12": 350 },
+    { "scenario": "VT ControlTS Intermediate S5", "now": 391.6, "week4": 400, "week8": 420, "week12": 430 },
+    { "scenario": "VT Penta Bounce Intermediate S5", "now": 370.6, "week4": 380, "week8": 395, "week12": 405 },
+    { "scenario": "VT Popcorn Intermediate S5", "now": 560, "week4": 600, "week8": 620, "week12": "Diamond-forsøg" },
+    { "scenario": "VT Frogtagon Intermediate S5", "now": 920, "week4": 940, "week8": 960, "week12": "Diamond-forsøg" },
+    { "scenario": "VT EddieTS Intermediate S5", "now": 900, "week4": "holde", "week8": null, "week12": "Diamond-forsøg" },
+    { "scenario": "VT DotTS Intermediate S5", "now": 1047, "week4": "holde", "week8": 1110, "week12": "Diamond-forsøg" }
+  ]
+}

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.sqlite
+dist-build/
+
+# Personal files, kept locally only
+PROMPT.md
+docs/training-program.pdf
+CLAUDE.md

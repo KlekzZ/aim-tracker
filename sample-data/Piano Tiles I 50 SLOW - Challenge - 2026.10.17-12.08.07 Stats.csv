@@ -1,0 +1,50 @@
+Kill #,Timestamp,Bot,Weapon,TTK,Shots,Hits,Accuracy,Damage Done,Damage Possible,Efficiency,Cheated,OverShots
+1,12:08:06.361,bot profile for PIANO TILES,Track Master 100,0.001000s,1,1,1.000000,1.000000,1.000000,1.000000,0,0
+2,12:08:06.541,bot profile for PIANO TILES,Track Master 100,0.000000s,1,1,1.000000,1.000000,1.000000,1.000000,0,0
+
+Weapon,Shots,Hits,Damage Done,Damage Possible,,Sens Scale,Horiz Sens,Vert Sens,FOV,Hide Gun,Crosshair,Crosshair Scale,Crosshair Color,ADS Sens,ADS Zoom Scale,Avg Target Scale,Avg Time Dilation
+Track Master 100,3,2,2.0,3.0,
+
+Kills:,2
+Deaths:,0
+Fight Time:,0.001
+Time Remaining:,0.0
+Avg TTK:,0.882345
+Damage Done:,2.0
+Total Overshots:,0
+Damage Taken:,0.0
+Hit Count:,2
+Miss Count:,1
+Midairs:,0
+Midaired:,0
+Directs:,0
+Directed:,0
+Reloads:,0
+Distance Traveled:,0.0
+MBS Points:,0.0
+Score:,2.0
+Scenario:,Piano Tiles I 50% SLOW
+Hash:,3fe34956abd95934c98c67eae1fec1e1
+Game Version:,3.9.10.2026-09-28-11-58-12-6935f347dcca
+Challenge Start:,12:08:05.380
+Pause Count:,0
+Pause Duration:,0
+Avg Target Scale:,1.0
+Avg Time Dilation:,1.0
+
+Input Lag:,0
+Max FPS (config):,999.0
+Sens Scale:,CSGO
+Sens Increment:,0.267143
+Horiz Sens:,0.85
+Vert Sens:,0.85
+DPI:,800
+FOV:,90.0
+FOVScale:,CSGO
+Hide Gun:,false
+Crosshair:,ZeeqPlus2.png
+Crosshair Scale:,0.7
+Crosshair Color:,010101FF
+Resolution:,1280x960
+Avg FPS:,881.741516
+Resolution Scale:,100.0
