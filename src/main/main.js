@@ -5,7 +5,7 @@ const path = require('node:path');
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const db = require('../core/db');
 const { importFolder } = require('../core/importer');
-const { buildData, config, planCodesTodayFirst } = require('./data-service');
+const { buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone } = require('./data-service');
 const kovaaks = require('./kovaaks');
 const { loadSettings, saveSettings } = require('./app-settings');
 const updater = require('./updater');
@@ -124,7 +124,7 @@ function registerIpc() {
       lastScan,
       updateStatus,
       playlistStatus,
-    })
+    }, { followPlan: settings.followPlan })
   );
 
   ipcMain.handle('rescan', () => scan());
@@ -163,12 +163,27 @@ function registerIpc() {
 
   ipcMain.handle('check-for-update', () => startUpdater());
   ipcMain.handle('refresh-playlists', () => cachePlaylists(true));
+
+  // "Følg planen": the toggle, where to start, and the escape hatch.
+  ipcMain.handle('set-follow-plan', (_event, enabled) => {
+    settings.followPlan = Boolean(enabled);
+    saveSettings(settings);
+    notifyPage('data-changed');
+  });
+  ipcMain.handle('follow-start', (_event, index) => {
+    setFollowStart(database, Math.max(0, Math.floor(Number(index) || 0)));
+    notifyPage('data-changed');
+  });
+  ipcMain.handle('follow-mark-done', () => {
+    markFollowDone(database);
+    notifyPage('data-changed');
+  });
   ipcMain.handle('open-in-kovaaks', (_event, target) => kovaaks.openInKovaaks(target || {}));
   ipcMain.handle('install-update', () => updater.installNow());
 }
 
 app.whenReady().then(async () => {
-  settings = loadSettings({ statsDir: config.default_stats_dir_windows, autoUpdate: true });
+  settings = loadSettings({ statsDir: config.default_stats_dir_windows, autoUpdate: true, followPlan: false });
   // The database file lives in %APPDATA%\Aim Tracker, not in the KovaaK's folder.
   database = db.openDatabase(path.join(app.getPath('userData'), 'aim-tracker.sqlite'));
 

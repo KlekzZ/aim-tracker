@@ -5,8 +5,9 @@ const path = require('node:path');
 const db = require('../core/db');
 const stats = require('../core/stats');
 const plan = require('../core/plan');
+const program = require('../core/program');
+const follow = require('../core/follow');
 const { cmPer360 } = require('../core/sens');
-const { playlistProgress } = require('../core/playlist-progress');
 
 const appRoot = path.join(__dirname, '..', '..');
 const readJson = (...parts) => JSON.parse(fs.readFileSync(path.join(appRoot, ...parts), 'utf8'));
@@ -14,10 +15,16 @@ const readJson = (...parts) => JSON.parse(fs.readFileSync(path.join(appRoot, ...
 const config = readJson('data', 'config.json');
 const thresholds = readJson('data', 'voltaic_s5_5_thresholds.json');
 const targets = readJson('data', 'targets.json').targets;
+const programData = readJson('data', 'program.json');
+const passes = program.buildPasses(programData);
 const shareCodes = plan.readShareCodes(fs.readFileSync(path.join(appRoot, 'docs', 'training-program.md'), 'utf8'));
 
-// Every share code the plan mentions. main.js caches these from kovaaks.com.
-const allPlanCodes = [...new Set([...Object.values(shareCodes.adept), ...Object.values(shareCodes.benchmarks)])];
+// Every share code the plan and the program use. main.js caches these from kovaaks.com.
+const allPlanCodes = [...new Set([
+  ...Object.values(shareCodes.adept),
+  ...Object.values(shareCodes.benchmarks),
+  ...passes.flatMap((pass) => pass.parts.filter((p) => p.kind === 'playlist').map((p) => p.code)),
+])];
 
 // The sens settings we show per run, and highlight when they change.
 const SENS_KEYS = ['sensScale', 'sens', 'dpi'];
@@ -34,8 +41,9 @@ function runsWithSens(runs) {
 }
 
 // The plan's session template (docs/training-program.md, "Daglig session-skabelon"),
-// with the playlist time filled in from the real playlist.
+// with the playlist time filled in from the real playlists.
 function sessionSteps(playlistMinutes) {
+  if (!playlistMinutes) return [];
   return [
     { name: 'Opvarmning', minutes: 5, text: 'Stræk hænder, håndled, underarme, nakke og skuldre.' },
     { name: 'Below-level', minutes: 5, text: '1 til 2 lette scenarier. Fokus: lavt greb.' },
@@ -46,35 +54,70 @@ function sessionSteps(playlistMinutes) {
   ];
 }
 
-function todaysSession(today, runs, playlists) {
-  const runsToday = runs.filter((run) => run.playedAt.startsWith(today.date));
-  const blocks = today.codes.map((entry) => {
-    const playlist = playlists[entry.code];
-    return {
-      ...entry,
-      playlistName: playlist ? playlist.name : null,
-      progress: playlist ? playlistProgress(playlist, runsToday) : null,
-    };
-  });
-  const playlistMinutes = blocks.reduce((sum, b) => sum + (b.progress ? b.progress.estimatedMinutes : 0), 0);
-  const steps = playlistMinutes > 0 ? sessionSteps(playlistMinutes) : [];
-  return {
-    blocks,
-    steps,
-    totalMinutes: steps.reduce((sum, step) => sum + step.minutes, 0),
-    complete: blocks.length > 0 && blocks.every((b) => b.progress && b.progress.complete),
-  };
+function withSteps(session) {
+  const steps = sessionSteps(session.progress ? session.progress.estimatedMinutes : 0);
+  return { ...session, steps, totalMinutes: steps.reduce((sum, step) => sum + step.minutes, 0) };
 }
 
-function buildData(database, extra) {
+// Calendar mode: today's weekday in the plan, counting today's runs.
+function calendarSession(today, runs, playlists) {
+  const pseudoPass = { deload: false, parts: today.codes.map((c) => ({ kind: 'playlist', code: c.code, title: c.name })) };
+  const runsToday = runs.filter((run) => run.playedAt.startsWith(today.date));
+  const progress = today.codes.length ? program.passProgress(pseudoPass, runsToday, playlists, 1) : null;
+  return withSteps({
+    mode: 'calendar',
+    status: today.codes.length ? 'active' : 'none',
+    title: today.schedule,
+    position: today.weekInfo,
+    progress,
+  });
+}
+
+// Follow mode: the pass the pointer is on. Moves the pointer on (and saves it)
+// when the current pass is finished.
+function followSession(database, today, runs, playlists, logs) {
+  let state = db.getState(database, 'follow') || follow.startState(0, today);
+  const result = follow.advance(state, passes, runs, playlists, programData.deload_volume, today);
+  if (result.changed || !db.getState(database, 'follow')) db.setState(database, 'follow', result.state);
+  state = result.state;
+
+  const view = follow.followView(state, passes, runs, playlists, programData.deload_volume, today);
+  const pass = view.pass;
+  // Safety: pain 5+ twice in a row, and the last log is from today -> rest today.
+  const lastLogDay = logs[0] ? plan.isoDay(new Date(logs[0].created_at)) : null;
+  const painLock = view.status === 'active' && stats.needsRestWarning(logs) && lastLogDay === today;
+
+  return withSteps({
+    mode: 'follow',
+    status: painLock ? 'pain' : view.status,
+    title: pass ? `${program.passTitle(pass)}: ${pass.label}` : 'Programmet er gennemført',
+    passText: pass ? pass.text : null,
+    position: pass ? { week: pass.week, block: pass.block, deload: pass.deload } : null,
+    progress: painLock ? null : view.progress || null,
+    opensOn: view.opensOn || null,
+    finishedToday: Boolean(view.finishedToday),
+    daysWaiting: view.daysWaiting || 0,
+    index: view.index,
+    total: view.total,
+    done: view.done,
+  });
+}
+
+function buildData(database, extra, options = {}) {
   const runs = runsWithSens(db.allRuns(database));
   const summaries = stats.scenarioSummaries(runs, thresholds, targets);
   const logs = db.sessionLogs(database);
   const today = plan.todaysTraining(new Date(), config, shareCodes);
+  const playlists = db.allPlaylists(database);
 
   return {
     today,
-    session: todaysSession(today, runs, db.allPlaylists(database)),
+    followPlan: Boolean(options.followPlan),
+    session: options.followPlan
+      ? followSession(database, today.date, runs, playlists, logs)
+      : calendarSession(today, runs, playlists),
+    // For the "Start fra" list on the settings page.
+    passes: passes.map((pass, index) => ({ index, title: `${program.passTitle(pass)}: ${pass.label}` })),
     latestRun: runs[runs.length - 1] || null,
     scenarios: summaries,
     radar: stats.radarData(summaries),
@@ -97,4 +140,13 @@ function planCodesTodayFirst() {
   return [...new Set([...todayCodes, ...allPlanCodes])];
 }
 
-module.exports = { buildData, config, planCodesTodayFirst };
+// Used by main.js for the follow-plan buttons.
+function setFollowStart(database, index) {
+  db.setState(database, 'follow', follow.startState(index, plan.isoDay(new Date())));
+}
+function markFollowDone(database) {
+  const state = db.getState(database, 'follow');
+  if (state) db.setState(database, 'follow', follow.markDone(state, passes, plan.isoDay(new Date())));
+}
+
+module.exports = { buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone };

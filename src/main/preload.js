@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('api', {
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   refreshPlaylists: () => ipcRenderer.invoke('refresh-playlists'),
+  setFollowPlan: (enabled) => ipcRenderer.invoke('set-follow-plan', enabled),
+  followStart: (index) => ipcRenderer.invoke('follow-start', index),
+  followMarkDone: () => ipcRenderer.invoke('follow-mark-done'),
   // target: { type: 'playlist', code } or { type: 'scenario', name }
   openInKovaaks: (target) => ipcRenderer.invoke('open-in-kovaaks', target),
   onDataChanged: (callback) => ipcRenderer.on('data-changed', () => callback()),

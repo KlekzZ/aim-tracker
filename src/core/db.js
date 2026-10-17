@@ -43,6 +43,12 @@ const SCHEMA = `
     fetched_at TEXT NOT NULL
   );
 
+  -- Small app state as JSON by key, e.g. where you are in the plan ("follow").
+  CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
   -- The post-session form.
   CREATE TABLE IF NOT EXISTS session_logs (
     id INTEGER PRIMARY KEY,
@@ -129,6 +135,15 @@ function allPlaylists(db) {
   return result;
 }
 
+function getState(db, key) {
+  const row = db.prepare('SELECT value FROM app_state WHERE key = ?').get(key);
+  return row ? JSON.parse(row.value) : null;
+}
+
+function setState(db, key, value) {
+  db.prepare('INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)').run(key, JSON.stringify(value));
+}
+
 function addSessionLog(db, entry) {
   db.prepare(
     'INSERT INTO session_logs (created_at, focus_cue, tension, pain, note) VALUES (?, ?, ?, ?, ?)'
@@ -151,6 +166,8 @@ module.exports = {
   allProblems,
   savePlaylist,
   allPlaylists,
+  getState,
+  setState,
   addSessionLog,
   sessionLogs,
 };

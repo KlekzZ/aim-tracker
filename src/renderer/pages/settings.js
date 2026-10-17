@@ -30,15 +30,28 @@ function renderSettings(data) {
           ${data.playlistStatus.text ? `<p class="${data.playlistStatus.error ? 'changed' : 'secondary'} small">${esc(data.playlistStatus.text)}</p>` : ''}
         </div>
       </div>
-      <div class="card">
-        <h2>Opdatering</h2>
-        <p>Version <b>${esc(data.appVersion)}</b></p>
-        <label class="toggle"><input type="checkbox" id="auto-update" ${data.autoUpdate ? 'checked' : ''}>
-          Søg automatisk efter nye versioner på GitHub</label>
-        <p class="muted small">Appen bruger kun internettet til det her og til at slå playlister op. Der sendes ingen data om dig.</p>
-        <p id="update-status" class="secondary">${esc(data.updateStatus.text)}</p>
-        <button class="btn ghost" id="check-update">${icon('refresh', 16)}Søg nu</button>
-        <button class="btn" id="install-update" ${data.updateStatus.canInstall ? '' : 'hidden'}>${icon('download', 16)}Genstart og opdater</button>
+      <div class="stack">
+        <div class="card">
+          <h2>Følg planen</h2>
+          <p class="muted small">Når "Følg planen" er slået til på I dag, går appen frem pas for pas. Du kommer først videre,
+            når passet er spillet færdigt, og misser du en dag, venter passet på dig. Her vælger du, hvor du starter.</p>
+          ${data.followPlan && data.session.total ? `<p>Du er på pas <b>${data.session.index + 1}</b> af ${data.session.total} (${data.session.done} gennemført).</p>` : ''}
+          <div class="start-row">
+            <select id="follow-start">${data.passes.map((p) => `<option value="${p.index}" ${data.followPlan && p.index === data.session.index ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select>
+            <button class="btn ghost" id="follow-start-btn">Start herfra</button>
+          </div>
+          <p class="muted small">Starter du forfra, nulstilles listen over gennemførte pas. Dine runs bliver ikke rørt.</p>
+        </div>
+        <div class="card">
+          <h2>Opdatering</h2>
+          <p>Version <b>${esc(data.appVersion)}</b></p>
+          <label class="toggle"><input type="checkbox" id="auto-update" ${data.autoUpdate ? 'checked' : ''}>
+            Søg automatisk efter nye versioner på GitHub</label>
+          <p class="muted small">Appen bruger kun internettet til det her og til at slå playlister op. Der sendes ingen data om dig.</p>
+          <p id="update-status" class="secondary">${esc(data.updateStatus.text)}</p>
+          <button class="btn ghost" id="check-update">${icon('refresh', 16)}Søg nu</button>
+          <button class="btn" id="install-update" ${data.updateStatus.canInstall ? '' : 'hidden'}>${icon('download', 16)}Genstart og opdater</button>
+        </div>
       </div>
     </div>`;
 
@@ -48,6 +61,12 @@ function renderSettings(data) {
   document.getElementById('auto-update').addEventListener('change', (ev) => window.api.setAutoUpdate(ev.target.checked));
   document.getElementById('check-update').addEventListener('click', () => window.api.checkForUpdate());
   document.getElementById('install-update').addEventListener('click', () => window.api.installUpdate());
+  document.getElementById('follow-start-btn').addEventListener('click', async () => {
+    const select = document.getElementById('follow-start');
+    if (!confirm(`Start planen fra "${select.selectedOptions[0].text}"?`)) return;
+    await window.api.followStart(Number(select.value));
+    await window.api.setFollowPlan(true);
+  });
 }
 
 // Called when the updater sends news, without redrawing the whole page.

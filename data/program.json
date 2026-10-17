@@ -1,0 +1,50 @@
+{
+  "_note": "The 12-week plan from docs/training-program.md written as data. Share codes and Viscose scenario names are copied from the plan; the Viscose names are spelled as in the kovaaks.com playlists. A pass is one training session. 'parts' are playlists (by share code) or a list of scenarios.",
+  "name": "Gold til Platinum (12 uger)",
+  "total_weeks": 12,
+  "deload_weeks": [4, 8, 12],
+  "deload_volume": 0.5,
+
+  "week0": [
+    {
+      "label": "Opstart: baseline",
+      "text": "Spil S5.5 Intermediate og Viscose Medium én gang hver for at se, hvor du står.",
+      "parts": [
+        { "playlist": "KovaaKsCarryingNarrowCt", "title": "Voltaic S5.5 Intermediate" },
+        { "playlist": "KovaaKsVibratingFlankedLurker", "title": "Viscose S1 Medium" }
+      ]
+    }
+  ],
+
+  "week": [
+    { "day": "Mon", "label": "VDIM Adept Tracking I", "parts": [{ "playlist": "KovaaKsCampingGoatedFamas", "title": "VDIM Adept Tracking I" }] },
+    { "day": "Tue", "label": "VDIM Adept Clicking I/II", "parts": [{ "playlist_odd_week": "KovaaKsCarryingGodlikeTile", "playlist_even_week": "KovaaKsCapturingGodlikeCamper", "title_odd_week": "VDIM Adept Clicking I", "title_even_week": "VDIM Adept Clicking II" }] },
+    { "day": "Wed", "label": "VDIM Adept Tracking II", "parts": [{ "playlist": "KovaaKsCamouflagingGhostpeekedOfficer", "title": "VDIM Adept Tracking II" }] },
+    { "day": "Thu", "label": "VDIM Adept Switching I", "parts": [{ "playlist": "KovaaKsCallingGearedWipe", "title": "VDIM Adept Switching I" }] },
+    { "day": "Fri", "label": "Viscose-dag", "parts": [{ "viscose_by_block": true, "runs_each": 3 }] },
+    { "day": "Sat", "label": "VDIM Adept Switching II", "parts": [{ "playlist": "KovaaKsBuyingGearedChatfrag", "title": "VDIM Adept Switching II" }] }
+  ],
+
+  "viscose_by_block": {
+    "1": {
+      "title": "Viscose: Control Tracking Arm + Reactive Tracking",
+      "scenarios": ["SmoothBot Invincible Goated 75%", "Whisphere 80%", "Controlsphere rAim Easy 90%", "Polarized Hell Easy 40% Slower", "Air Voltaic Easy Invincible 4 80%", "Air Pure Intermediate Slower No UFO"]
+    },
+    "2": {
+      "title": "Viscose: Flick Tech Evasive + Stability",
+      "scenarios": ["domiSwitch Easy Slower", "tamTargetSwitch Smooth Easy", "beanTS Larger", "FloatTS Angelic Easy Larger", "domiSwitch Easy", "beanTS"]
+    },
+    "3": {
+      "title": "Viscose: Fingertip på 40 cm/360",
+      "text": "Planen siger: svageste radar-punkt efter testen i uge 8, plus Fingertip på korrekt sens.",
+      "scenarios": ["Air Angelic 4 Voltaic Easy 80% (Good Version)", "cloverRawControl Easy 80% Speed", "Controlsphere Far, Far Larger 90%"]
+    }
+  },
+
+  "deload_tests": {
+    "_note": "In deload weeks the Saturday pass is a full benchmark test instead (played at full volume).",
+    "4": [{ "playlist": "KovaaKsCarryingNarrowCt", "title": "Test: Voltaic S5.5 Intermediate" }],
+    "8": [{ "playlist": "KovaaKsCarryingNarrowCt", "title": "Test: Voltaic S5.5 Intermediate" }, { "playlist": "KovaaKsGearingMehLowground", "title": "Test: Viscose S1 Easier" }],
+    "12": [{ "playlist": "KovaaKsCarryingNarrowCt", "title": "Test: Voltaic S5.5 Intermediate" }, { "playlist": "KovaaKsGearingMehLowground", "title": "Test: Viscose S1 Easier" }, { "playlist": "KovaaKsVibratingFlankedLurker", "title": "Test: Viscose S1 Medium" }]
+  }
+}
