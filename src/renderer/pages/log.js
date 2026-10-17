@@ -1,43 +1,59 @@
 // "Log": every run with its settings, plus files that could not be read.
-// A yellow frame on a setting means it changed since the run before.
 
-const SETTING_COLUMNS = [
-  ['sensScale', 'Sens-skala', (r) => esc(r.sensScale)],
-  ['sens', 'Sens', (r) => num(r.sens, 2)],
-  ['dpi', 'DPI', (r) => num(r.dpi)],
-  ['fov', 'FOV', (r) => num(r.fov, 1)],
-  ['fovScale', 'FOVScale', (r) => esc(r.fovScale)],
-  ['resolution', 'Opløsning', (r) => esc(r.resolution)],
-];
+let onlyWarnings = false;
+
+// FOVScale names are long, so the compact settings line shortens the common ones.
+const FOV_SHORT = { Overwatch: 'OW', CSGO: 'CS' };
+
+function settingsLine(r) {
+  const part = (key, text) => `<span class="${r.changed.includes(key) ? 'changed' : ''}">${text}</span>`;
+  return [
+    part('sensScale', esc(r.sensScale)),
+    part('sens', num(r.sens, 2)),
+    part('dpi', `${num(r.dpi)} DPI`),
+    part('fov', `FOV ${num(r.fov, 0)}`) + ' ' + part('fovScale', esc(FOV_SHORT[r.fovScale] || r.fovScale)),
+    part('resolution', esc(r.resolution)),
+  ].join(' <span class="muted">·</span> ');
+}
 
 function renderLog(data) {
+  const runs = onlyWarnings ? data.runs.filter((r) => r.warnings.length) : data.runs;
+
   const problems = data.problems.length
-    ? `<div class="alert warning"><strong>⚠ ${data.problems.length} fil(er) kunne ikke læses</strong>
-        <ul>${data.problems.map((p) => `<li>${esc(p.file_name)}: ${esc(p.reason)}</li>`).join('')}</ul></div>`
+    ? `<div class="alert warning">${icon('alert')}<div><b>${data.problems.length} fil(er) kunne ikke læses</b>
+        <ul>${data.problems.map((p) => `<li>${esc(p.file_name)}: ${esc(p.reason)}</li>`).join('')}</ul></div></div>`
     : '';
 
-  const rows = data.runs.map((r) => `
+  const rows = runs.map((r) => `
     <tr>
       <td>${dateTime(r.playedAt)}</td>
-      <td>${esc(r.scenario)}</td>
-      <td>${esc(r.mode)}</td>
+      <td class="name-cell"><b>${esc(r.scenario)}</b>${r.mode.toLowerCase() !== 'challenge' ? `<small>${esc(r.mode)}</small>` : ''}</td>
       <td class="num">${num(r.score, 1)}</td>
       <td class="num">${pct(r.accuracy)}</td>
-      ${SETTING_COLUMNS.map(([key, , show]) => `<td class="${r.changed.includes(key) ? 'changed' : ''}">${show(r)}</td>`).join('')}
+      <td class="small">${settingsLine(r)}${r.changed.length ? ' <span class="pill warning">ændret</span>' : ''}</td>
       <td class="num">${r.horizontalFov === null ? '?' : num(r.horizontalFov, 1) + '°'}</td>
-      <td>${r.warnings.length ? '⚠ ' + r.warnings.map(esc).join('<br>⚠ ') : '✓'}</td>
+      <td>${r.warnings.length
+        ? `<details><summary><span class="pill warning">${icon('alert')}${r.warnings.length}</span></summary><ul class="small secondary">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></details>`
+        : `<span class="pill good">${icon('check')}OK</span>`}</td>
     </tr>`).join('');
 
-  document.getElementById('page-log').innerHTML = `
-    ${problems}
-    <div class="card">
-      <h2>Alle runs (${data.runs.length})</h2>
-      <p class="muted">Gul ramme = indstillingen ændrede sig siden runnet før.</p>
-      <div class="table-wrap"><table>
-        <tr><th>Tid</th><th>Scenarie</th><th>Type</th><th class="num">Score</th><th class="num">Accuracy</th>
-          ${SETTING_COLUMNS.map(([, label]) => `<th>${label}</th>`).join('')}
-          <th class="num">Horisontal FOV</th><th>Advarsler</th></tr>
-        ${rows}
-      </table></div>
+  const filter = `<label class="toggle"><input type="checkbox" id="only-warnings" ${onlyWarnings ? 'checked' : ''}>Kun runs med advarsler</label>`;
+
+  const page = document.getElementById('page-log');
+  page.innerHTML = `
+    ${pageHead('Log', `${data.runs.length} runs. Gul tekst = indstillingen ændrede sig siden runnet før.`, filter)}
+    <div class="stack">
+      ${problems}
+      <div class="card table-wrap">
+        ${runs.length ? `<table>
+          <tr><th>Tid</th><th>Scenarie</th><th class="num">Score</th><th class="num">Acc.</th><th>Indstillinger</th><th class="num">H-FOV</th><th>Status</th></tr>
+          ${rows}
+        </table>` : '<div class="empty">Ingen runs at vise.</div>'}
+      </div>
     </div>`;
+
+  document.getElementById('only-warnings').addEventListener('change', (e) => {
+    onlyWarnings = e.target.checked;
+    renderLog(data);
+  });
 }

@@ -8,17 +8,27 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Aim Tracker</h1>
+  <!-- The window has no normal title bar, so this strip lets you drag it. -->
+  <div class="drag-strip"></div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="assets/logo.svg" alt="">
+      <div>
+        <strong>Aim Tracker</strong>
+        <span>12-ugers plan</span>
+      </div>
+    </div>
     <nav id="nav">
-      <button data-page="today" class="active">I dag</button>
-      <button data-page="scenarios">Scenarier</button>
-      <button data-page="radar">Radar</button>
-      <button data-page="sessions">Sessioner</button>
-      <button data-page="log">Log</button>
-      <button data-page="settings">Indstillinger</button>
+      <button data-page="today" class="active"><span class="icon" data-icon="home"></span>I dag</button>
+      <button data-page="scenarios"><span class="icon" data-icon="target"></span>Scenarier</button>
+      <button data-page="radar"><span class="icon" data-icon="radar"></span>Radar</button>
+      <button data-page="sessions"><span class="icon" data-icon="clock"></span>Sessioner</button>
+      <button data-page="log"><span class="icon" data-icon="list"></span>Log</button>
+      <button data-page="settings"><span class="icon" data-icon="gear"></span>Indstillinger</button>
     </nav>
-  </header>
+    <div class="sidebar-foot" id="sidebar-foot"></div>
+  </aside>
 
   <main>
     <section id="page-today" class="page active"></section>
@@ -30,6 +40,7 @@
   </main>
 
   <script src="vendor/chart.umd.min.js"></script>
+  <script src="icons.js"></script>
   <script src="format.js"></script>
   <script src="charts.js"></script>
   <script src="pages/today.js"></script>

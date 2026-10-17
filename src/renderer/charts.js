@@ -16,6 +16,7 @@ function replaceChart(canvasId, config) {
 function baseOptions() {
   Chart.defaults.font.family = 'system-ui, "Segoe UI", sans-serif';
   Chart.defaults.color = cssColor('--text-2');
+  Chart.defaults.borderColor = cssColor('--grid');
   return { responsive: true, maintainAspectRatio: false, animation: false };
 }
 
@@ -63,6 +64,7 @@ function drawRadar(canvasId, radar) {
         },
       },
       plugins: {
+        legend: { display: false }, // the page shows its own legend above the chart
         tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.raw === null ? '-' : Math.round(c.raw * 100) + ' %'}` } },
       },
     },

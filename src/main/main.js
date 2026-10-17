@@ -56,9 +56,16 @@ function startUpdater() {
 
 function createWindow() {
   window = new BrowserWindow({
-    width: 1280,
-    height: 860,
+    width: 1360,
+    height: 900,
+    minWidth: 1000,
+    minHeight: 640,
     title: 'Aim Tracker',
+    icon: path.join(__dirname, '..', 'renderer', 'assets', 'icon.png'),
+    backgroundColor: '#0e0f13', // same as the page, so there's no white flash on start
+    // Hide the normal Windows title bar but keep its buttons, in dark colors.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#0e0f13', symbolColor: '#a9adb7', height: 38 },
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

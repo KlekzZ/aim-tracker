@@ -1,7 +1,7 @@
 {
   "name": "aim-tracker",
   "productName": "Aim Tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local, read-only KovaaK's progress tracker for a 12-week aim training plan",
   "author": "KlekzZ",
   "license": "UNLICENSED",
@@ -14,6 +14,7 @@
     "start": "electron .",
     "test": "node --test \"test/*.test.js\"",
     "scan": "node scripts/scan.js",
+    "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always"
   },

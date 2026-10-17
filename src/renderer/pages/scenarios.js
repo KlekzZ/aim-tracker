@@ -1,84 +1,126 @@
-// "Scenarier": every Voltaic scenario with best, median, rank and targets.
-// Click a row to see its score trend.
+// "Scenarier": all Voltaic scenarios grouped by category, with a detail
+// panel (numbers, rank ladder, targets and score trend) for the selected one.
 
 let scenarioTier = 'Intermediate';
 let selectedScenario = null;
 
-function targetCell(value) {
-  if (value === null || value === undefined) return '-';
-  return typeof value === 'number' ? num(value) : esc(value);
+const CATEGORY_ORDER = ['Clicking', 'Tracking', 'Switching'];
+
+function scenarioRow(s, target) {
+  // Not played yet: show progress from the baseline (grey) instead of an empty bar.
+  const played = s.best !== null;
+  const info = played ? s : rankFor(s.baselineBest, s);
+  const progress = !info.nextRank
+    ? '<span class="pill good">Alle ranks</span>'
+    : info.progress === null ? '<span class="muted">-</span>' : progressBar(info.progress, !played);
+  return `
+    <tr class="clickable ${s.name === selectedScenario ? 'selected' : ''}" data-name="${esc(s.name)}">
+      <td class="name-cell"><b>${esc(shortName(s.name))}</b><small>${esc(s.subcategory)}</small></td>
+      <td>${played ? rankBadge(s.rank) : '<span class="muted small">Ikke spillet</span>'}</td>
+      <td class="num">${num(s.best, 1)}</td>
+      <td class="num">${num(s.medianLast3, 1)}</td>
+      <td>${progress}</td>
+      <td class="num">${targetText(s.target?.[target.key])}</td>
+    </tr>`;
+}
+
+// Challenge runs of one scenario, oldest first (data.runs is newest first).
+function scenarioRuns(data, name) {
+  return data.runs
+    .filter((r) => r.mode.toLowerCase() === 'challenge' && normalizeName(r.scenario) === normalizeName(name))
+    .reverse();
+}
+
+function detailPanel(s, runs) {
+
+  const ladder = s.thresholds.map((t, i) => `
+    <div class="${s.best !== null && s.best >= t ? 'reached' : ''}">
+      <span>${esc(s.rankNames[i])}</span><b>${num(t)}</b>
+    </div>`).join('');
+
+  const targets = s.target
+    ? `<h3>Mål fra planen</h3>
+       <div class="kpis">
+         <div class="kpi"><span>Da planen blev lavet</span><b>${targetText(s.target.now)}</b></div>
+         <div class="kpi"><span>Uge 4</span><b>${targetText(s.target.week4)}</b></div>
+         <div class="kpi"><span>Uge 8</span><b>${targetText(s.target.week8)}</b></div>
+         <div class="kpi"><span>Uge 12</span><b>${targetText(s.target.week12)}</b></div>
+       </div>`
+    : '';
+
+  return `
+    <div class="card stack sticky">
+      <div>
+        <div class="secondary small">${esc(s.tier)} · ${esc(s.category)} / ${esc(s.subcategory)}</div>
+        <h2>${esc(s.name)}</h2>
+        ${rankBadge(s.rank)} ${s.nextRank ? `<span class="pill">Næste: ${esc(s.nextRank)} ${num(s.nextThreshold)}</span>` : ''}
+      </div>
+      <div class="kpis">
+        <div class="kpi"><span>Bedst</span><b>${num(s.best, 1)}</b></div>
+        <div class="kpi"><span>Median 3</span><b>${num(s.medianLast3, 1)}</b></div>
+        <div class="kpi"><span>Baseline</span><b>${num(s.baselineBest, 1)}</b></div>
+        <div class="kpi"><span>Runs</span><b>${s.runCount}</b></div>
+      </div>
+      <div><h3>Ranks</h3><div class="ladder">${ladder}</div></div>
+      ${targets}
+      <div>
+        <h3>Score over tid</h3>
+        ${runs.length ? '<div class="chart-box"><canvas id="trend-chart"></canvas></div>' : '<div class="empty">Ingen runs på dette scenarie endnu.</div>'}
+      </div>
+    </div>`;
 }
 
 function renderScenarios(data) {
-  const rows = data.scenarios.filter((s) => scenarioTier === 'Alle' || s.tier === scenarioTier);
+  const rows = data.scenarios.filter((s) => s.tier === scenarioTier);
   if (!selectedScenario || !rows.some((s) => s.name === selectedScenario)) {
     selectedScenario = (rows.find((s) => s.runCount > 0) || rows[0]).name;
   }
+  const selected = data.scenarios.find((s) => s.name === selectedScenario);
+  const runs = scenarioRuns(data, selectedScenario);
+  const target = currentTargetKey(data.today.weekInfo);
 
-  const tableRows = rows.map((s) => `
-    <tr class="clickable ${s.name === selectedScenario ? 'selected' : ''}" data-name="${esc(s.name)}">
-      <td>${esc(s.name)}</td>
-      <td>${esc(s.category)} / ${esc(s.subcategory)}</td>
-      <td class="num">${s.runCount}</td>
-      <td class="num">${num(s.best, 1)}</td>
-      <td class="num">${num(s.medianLast3, 1)}</td>
-      <td>${esc(s.rank || '-')}</td>
-      <td>${s.nextRank ? `${esc(s.nextRank)} (${num(s.nextThreshold)})` : 'Alle ranks nået'}</td>
-      <td><span class="bar"><span style-width="${Math.min(1, s.progress || 0)}"></span></span> ${pct(s.progress)}</td>
-      <td class="num">${pct(s.percentOfPlatinum)}</td>
-      <td class="num">${num(s.baselineBest, 1)}</td>
-      <td class="num">${targetCell(s.target?.week4)}</td>
-      <td class="num">${targetCell(s.target?.week8)}</td>
-      <td class="num">${targetCell(s.target?.week12)}</td>
-    </tr>`).join('');
+  const body = CATEGORY_ORDER.map((category) => {
+    const inCategory = rows.filter((s) => s.category === category);
+    return `<tr class="group"><td colspan="6">${category}</td></tr>${inCategory.map((s) => scenarioRow(s, target)).join('')}`;
+  }).join('');
 
   const unmatched = data.unmatched.length
     ? `<table><tr><th>Navn i dine filer</th><th class="num">Runs</th></tr>
        ${data.unmatched.map((u) => `<tr><td>${esc(u.name)}</td><td class="num">${u.runCount}</td></tr>`).join('')}</table>`
     : '<p class="muted">Ingen. Alle scenarier i dine filer findes i Voltaic-listen.</p>';
 
-  document.getElementById('page-scenarios').innerHTML = `
-    <div class="card">
-      <div class="filters">
-        <h2>Voltaic S5</h2>
-        ${['Intermediate', 'Novice', 'Alle'].map((tier) =>
-          `<button class="action ${tier === scenarioTier ? '' : 'secondary-btn'}" data-tier="${tier}">${tier}</button>`).join('')}
+  const tierSwitch = `<div class="segmented">${['Intermediate', 'Novice'].map((tier) =>
+    `<button class="${tier === scenarioTier ? 'on' : ''}" data-tier="${tier}">${tier}</button>`).join('')}</div>`;
+
+  const page = document.getElementById('page-scenarios');
+  page.innerHTML = `
+    ${pageHead('Scenarier', 'Voltaic S5. Kun Challenge-runs tæller. Grå bjælke = fra din baseline, indtil du har spillet scenariet.', tierSwitch)}
+    <div class="cols cols-split">
+      <div class="stack">
+        <div class="card table-wrap">
+          <table>
+            <tr><th>Scenarie</th><th>Rank</th><th class="num">Bedst</th><th class="num">Median 3</th><th>Mod næste rank</th><th class="num">${target.label}</th></tr>
+            ${body}
+          </table>
+        </div>
+        <details class="card">
+          <summary>Scenarier uden match (${data.unmatched.length})</summary>
+          <p class="muted small">Navne fra dine filer, som ikke står i Voltaic-listen. Appen gætter ikke. Står et Voltaic-scenarie her, er navnet anderledes (fx S5.5 i stedet for S5).</p>
+          ${unmatched}
+        </details>
       </div>
-      <p class="muted">Kun Challenge-runs tæller. "Fremskridt" er bedste score i procent af næste rank. Baseline er dine scores fra screenshots før planen.</p>
-      <div class="table-wrap"><table>
-        <tr><th>Scenarie</th><th>Kategori</th><th class="num">Runs</th><th class="num">Bedst</th><th class="num">Median sidste 3</th>
-            <th>Rank</th><th>Næste rank</th><th>Fremskridt</th><th class="num">% af Plat</th><th class="num">Baseline</th>
-            <th class="num">Mål uge 4</th><th class="num">Mål uge 8</th><th class="num">Mål uge 12</th></tr>
-        ${tableRows}
-      </table></div>
-    </div>
-    <div class="card">
-      <h3>Score over tid: ${esc(selectedScenario)}</h3>
-      <div id="trend-empty" class="muted"></div>
-      <div class="chart-box"><canvas id="trend-chart"></canvas></div>
-    </div>
-    <div class="card">
-      <h3>Scenarier uden match (unmatched)</h3>
-      <p class="muted">Navne fra dine filer, som ikke står i voltaic_s5_thresholds.json. Appen gætter ikke. Hvis et Voltaic-scenarie står her, er navnet anderledes (fx S5.5 i stedet for S5).</p>
-      ${unmatched}
+      ${detailPanel(selected, runs)}
     </div>`;
+  applyWidths(page);
 
-  // The CSP blocks inline style="" attributes, so widths are set from JS.
-  document.querySelectorAll('[style-width]').forEach((el) => { el.style.width = `${el.getAttribute('style-width') * 100}%`; });
-
-  document.querySelectorAll('[data-tier]').forEach((b) => b.addEventListener('click', () => {
+  page.querySelectorAll('[data-tier]').forEach((b) => b.addEventListener('click', () => {
     scenarioTier = b.dataset.tier;
     renderScenarios(data);
   }));
-  document.querySelectorAll('tr[data-name]').forEach((tr) => tr.addEventListener('click', () => {
+  page.querySelectorAll('tr[data-name]').forEach((tr) => tr.addEventListener('click', () => {
     selectedScenario = tr.dataset.name;
     renderScenarios(data);
   }));
 
-  const summary = data.scenarios.find((s) => s.name === selectedScenario);
-  const runs = data.runs
-    .filter((r) => r.mode.toLowerCase() === 'challenge' && normalizeName(r.scenario) === normalizeName(selectedScenario))
-    .reverse(); // data.runs is newest first; the chart wants oldest first
-  document.getElementById('trend-empty').textContent = runs.length ? '' : 'Ingen runs på dette scenarie endnu.';
-  drawTrend('trend-chart', runs, summary);
+  if (runs.length) drawTrend('trend-chart', runs, selected);
 }

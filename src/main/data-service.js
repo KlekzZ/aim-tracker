@@ -49,6 +49,8 @@ function buildData(database, extra) {
     restWarning: stats.needsRestWarning(logs),
     expectedSettings: config.expected_settings,
     sessionGapMinutes: config.session_gap_minutes,
+    totalWeeks: config.total_weeks,
+    deloadWeeks: config.deload_weeks,
     ...extra,
   };
 }

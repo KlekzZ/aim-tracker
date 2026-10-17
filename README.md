@@ -13,6 +13,7 @@ npm install
 npm start        # starter appen
 npm test         # kører tests
 npm run scan     # viser hvad parseren finder i din stats-mappe (gemmer intet)
+npm run icon     # laver app-ikonet (PNG) ud fra src/renderer/assets/logo.svg
 ```
 
 ## Udgiv en ny version (auto-opdatering)
