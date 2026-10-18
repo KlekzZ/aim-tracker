@@ -58,10 +58,50 @@ const SCHEMA = `
     pain INTEGER,
     note TEXT
   );
+
+  -- Knowledge sources for the local AI coach: notes and transcripts the user
+  -- adds by hand ("Tilføj kilde"). id is a content hash, so re-adding the
+  -- same file is a no-op instead of a duplicate. Never synced anywhere.
+  CREATE TABLE IF NOT EXISTS knowledge_sources (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    file_name TEXT,
+    added_at TEXT NOT NULL,
+    char_count INTEGER NOT NULL,
+    full_text TEXT NOT NULL
+  );
+
+  -- One row per chunk of a source. embedding is a BLOB of 32-bit floats,
+  -- filled in once Ollama's embedding model has processed the chunk;
+  -- embedding_model records which model, so chunks from an old model are
+  -- never mixed with a new one in a similarity search.
+  CREATE TABLE IF NOT EXISTS knowledge_chunks (
+    id INTEGER PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES knowledge_sources(id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL,
+    heading_path TEXT,
+    meta_title TEXT,
+    meta_url TEXT,
+    text TEXT NOT NULL,
+    embedding BLOB,
+    embedding_model TEXT
+  );
+  CREATE INDEX IF NOT EXISTS knowledge_chunks_source ON knowledge_chunks (source_id);
+
+  -- Chat history with the local coach, so it survives an app restart.
+  CREATE TABLE IF NOT EXISTS coach_messages (
+    id INTEGER PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    citations TEXT
+  );
 `;
 
 function openDatabase(filePath) {
   const db = new DatabaseSync(filePath);
+  db.exec('PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
   return db;
 }
@@ -155,6 +195,78 @@ function sessionLogs(db) {
   return db.prepare('SELECT * FROM session_logs ORDER BY created_at DESC, id DESC').all();
 }
 
+// ---------- Knowledge base (local AI coach) ----------
+
+// Returns false if a source with this id (content hash) already exists.
+function addKnowledgeSource(db, source) {
+  const result = db.prepare(`
+    INSERT OR IGNORE INTO knowledge_sources (id, title, kind, file_name, added_at, char_count, full_text)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(source.id, source.title, source.kind, source.fileName, new Date().toISOString(), source.charCount, source.fullText);
+  return result.changes > 0;
+}
+
+function removeKnowledgeSource(db, id) {
+  db.prepare('DELETE FROM knowledge_sources WHERE id = ?').run(id);
+}
+
+// Sources with how many chunks each has and how many still need embedding.
+function allKnowledgeSources(db) {
+  return db.prepare(`
+    SELECT s.id, s.title, s.kind, s.file_name AS fileName, s.added_at AS addedAt, s.char_count AS charCount,
+      COUNT(c.id) AS chunkCount,
+      SUM(CASE WHEN c.embedding IS NULL THEN 1 ELSE 0 END) AS pendingCount
+    FROM knowledge_sources s LEFT JOIN knowledge_chunks c ON c.source_id = s.id
+    GROUP BY s.id ORDER BY s.added_at DESC
+  `).all();
+}
+
+function addKnowledgeChunks(db, sourceId, chunks) {
+  const insert = db.prepare(`
+    INSERT INTO knowledge_chunks (source_id, ordinal, heading_path, meta_title, meta_url, text)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  chunks.forEach((chunk, i) => insert.run(sourceId, i, chunk.headingPath, chunk.metaTitle, chunk.metaUrl, chunk.text));
+}
+
+// Chunks with no embedding yet, or embedded with an older model.
+function chunksNeedingEmbedding(db, model, limit) {
+  return db.prepare(`
+    SELECT id, text FROM knowledge_chunks
+    WHERE embedding IS NULL OR embedding_model IS NOT ? LIMIT ?
+  `).all(model, limit);
+}
+
+function countChunksNeedingEmbedding(db, model) {
+  return db.prepare('SELECT COUNT(*) AS n FROM knowledge_chunks WHERE embedding IS NULL OR embedding_model IS NOT ?').get(model).n;
+}
+
+function setChunkEmbedding(db, chunkId, embeddingBuffer, model) {
+  db.prepare('UPDATE knowledge_chunks SET embedding = ?, embedding_model = ? WHERE id = ?').run(embeddingBuffer, model, chunkId);
+}
+
+// All chunks ready for search with the given embedding model.
+function allChunksWithEmbeddings(db, model) {
+  return db.prepare(`
+    SELECT id, source_id AS sourceId, heading_path AS headingPath, meta_title AS metaTitle, meta_url AS metaUrl, text, embedding
+    FROM knowledge_chunks WHERE embedding_model = ?
+  `).all(model);
+}
+
+function addCoachMessage(db, message) {
+  db.prepare('INSERT INTO coach_messages (created_at, role, content, citations) VALUES (?, ?, ?, ?)')
+    .run(new Date().toISOString(), message.role, message.content, message.citations ? JSON.stringify(message.citations) : null);
+}
+
+function coachMessages(db) {
+  return db.prepare('SELECT id, created_at AS createdAt, role, content, citations FROM coach_messages ORDER BY id').all()
+    .map((row) => ({ ...row, citations: row.citations ? JSON.parse(row.citations) : null }));
+}
+
+function clearCoachMessages(db) {
+  db.prepare('DELETE FROM coach_messages').run();
+}
+
 module.exports = {
   openDatabase,
   isFileUnchanged,
@@ -170,4 +282,15 @@ module.exports = {
   setState,
   addSessionLog,
   sessionLogs,
+  addKnowledgeSource,
+  removeKnowledgeSource,
+  allKnowledgeSources,
+  addKnowledgeChunks,
+  chunksNeedingEmbedding,
+  countChunksNeedingEmbedding,
+  setChunkEmbedding,
+  allChunksWithEmbeddings,
+  addCoachMessage,
+  coachMessages,
+  clearCoachMessages,
 };

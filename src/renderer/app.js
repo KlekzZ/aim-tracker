@@ -10,6 +10,7 @@ const RENDERERS = {
   radar: renderRadar,
   sessions: renderSessions,
   log: renderLog,
+  coach: renderCoach,
   settings: renderSettings,
 };
 
@@ -46,5 +47,9 @@ window.api.onUpdateStatus((status) => {
   latestData.updateStatus = status;
   showUpdateStatus(status);
   renderSidebarFoot();
+});
+window.api.onCoachToken((piece) => {
+  appendCoachToken(piece);
+  if (currentPage === 'coach' && latestData) renderCoach(latestData);
 });
 refresh();

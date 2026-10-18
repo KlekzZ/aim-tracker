@@ -18,4 +18,15 @@ contextBridge.exposeInMainWorld('api', {
   openInKovaaks: (target) => ipcRenderer.invoke('open-in-kovaaks', target),
   onDataChanged: (callback) => ipcRenderer.on('data-changed', () => callback()),
   onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_event, status) => callback(status)),
+
+  // AI coach: local knowledge base and chat (Ollama on 127.0.0.1 only).
+  checkOllama: () => ipcRenderer.invoke('check-ollama'),
+  startOllama: () => ipcRenderer.invoke('start-ollama'),
+  pullModel: (model) => ipcRenderer.invoke('pull-model', model),
+  addKnowledgeSource: () => ipcRenderer.invoke('add-knowledge-source'),
+  removeKnowledgeSource: (id) => ipcRenderer.invoke('remove-knowledge-source', id),
+  askCoach: (question, includeStats) => ipcRenderer.invoke('ask-coach', question, includeStats),
+  clearCoachChat: () => ipcRenderer.invoke('clear-coach-chat'),
+  onCoachToken: (callback) => ipcRenderer.on('coach-token', (_event, piece) => callback(piece)),
+  openExternal: (url) => ipcRenderer.invoke('open-external-link', url),
 });

@@ -2,7 +2,7 @@
 // folder, and answers the page's requests.
 const fs = require('node:fs');
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const db = require('../core/db');
 const { importFolder } = require('../core/importer');
 const { buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone } = require('./data-service');
@@ -10,6 +10,9 @@ const kovaaks = require('./kovaaks');
 const { loadSettings, saveSettings } = require('./app-settings');
 const updater = require('./updater');
 const { codeVersion } = require('./version');
+const ollama = require('./ollama');
+const knowledge = require('./knowledge');
+const coach = require('./coach');
 
 let window = null;
 let database = null;
@@ -18,6 +21,9 @@ let watcher = null;
 let lastScan = { at: null, summary: null, error: null };
 let updateStatus = { text: '', canInstall: false };
 let playlistStatus = { text: '', error: false };
+let ollamaStatus = { checking: true, installed: false, running: false, models: [], embedReady: false, chatReady: false };
+let embedStatus = { text: '', busy: false };
+let pullStatus = { model: null, text: '', percent: null, error: null };
 
 function notifyPage(channel, payload) {
   if (window && !window.isDestroyed()) window.webContents.send(channel, payload);
@@ -82,6 +88,43 @@ async function cachePlaylists(force) {
   notifyPage('data-changed');
 }
 
+// Checks whether Ollama is running and which models it has, so the page can
+// tell the user exactly what's missing instead of just "it doesn't work".
+async function refreshOllamaStatus() {
+  const running = await ollama.isRunning();
+  const models = running ? await ollama.listModels().catch(() => []) : [];
+  ollamaStatus = {
+    checking: false,
+    installed: Boolean(ollama.findInstallation()),
+    running,
+    models,
+    embedReady: ollama.hasModel(models, settings.coachEmbedModel),
+    chatReady: ollama.hasModel(models, settings.coachChatModel),
+  };
+  notifyPage('data-changed');
+  return ollamaStatus;
+}
+
+// Embeds any knowledge chunks that don't have a vector yet. Safe to call
+// often: it does nothing if Ollama isn't running or nothing is pending.
+async function embedPending() {
+  if (!ollamaStatus.running || !ollamaStatus.embedReady) return;
+  const pending = db.countChunksNeedingEmbedding(database, settings.coachEmbedModel);
+  if (pending === 0) return;
+  embedStatus = { text: `Indekserer kilder: 0 af ${pending}...`, busy: true };
+  notifyPage('data-changed');
+  try {
+    await knowledge.embedPendingChunks(database, settings.coachEmbedModel, (done, total) => {
+      embedStatus = { text: `Indekserer kilder: ${done} af ${total}...`, busy: true };
+      notifyPage('data-changed');
+    });
+    embedStatus = { text: '', busy: false };
+  } catch (err) {
+    embedStatus = { text: `Indeksering fejlede: ${err.message}`, busy: false };
+  }
+  notifyPage('data-changed');
+}
+
 function startUpdater() {
   updater.startUpdater(settings.autoUpdate, (text, canInstall) => {
     updateStatus = { text, canInstall };
@@ -125,6 +168,12 @@ function registerIpc() {
       lastScan,
       updateStatus,
       playlistStatus,
+      ollamaStatus,
+      embedStatus,
+      pullStatus,
+      coachConfig: { embedModel: settings.coachEmbedModel, chatModel: settings.coachChatModel },
+      knowledgeSources: db.allKnowledgeSources(database),
+      coachMessages: db.coachMessages(database),
     }, { followPlan: settings.followPlan })
   );
 
@@ -181,10 +230,111 @@ function registerIpc() {
   });
   ipcMain.handle('open-in-kovaaks', (_event, target) => kovaaks.openInKovaaks(target || {}));
   ipcMain.handle('install-update', () => updater.installNow());
+
+  // ---------- AI coach: local knowledge base and chat (Ollama, 127.0.0.1 only) ----------
+
+  ipcMain.handle('check-ollama', () => refreshOllamaStatus().then(() => embedPending()));
+
+  // Starts the installed Ollama app, the same as double-clicking its icon.
+  ipcMain.handle('start-ollama', async () => {
+    const exe = ollama.findInstallation();
+    if (!exe) return false;
+    await shell.openPath(exe);
+    // Give the server a few seconds to come up, then look again.
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await refreshOllamaStatus();
+    return ollamaStatus.running;
+  });
+
+  // Downloads a model through the local Ollama server. Only the two models
+  // the app is configured to use, so the page can't ask for anything else.
+  ipcMain.handle('pull-model', async (_event, model) => {
+    const allowed = [settings.coachEmbedModel, settings.coachChatModel];
+    if (!allowed.includes(model)) return;
+    pullStatus = { model, text: 'Starter download...', percent: null, error: null };
+    notifyPage('data-changed');
+    try {
+      await ollama.pullModel(model, (progress) => {
+        pullStatus = { model, text: progress.status, percent: progress.percent, error: null };
+        notifyPage('data-changed');
+      });
+      pullStatus = { model: null, text: '', percent: null, error: null };
+      await refreshOllamaStatus();
+      await embedPending();
+    } catch (err) {
+      pullStatus = { model: null, text: '', percent: null, error: `Download fejlede: ${err.message}` };
+      notifyPage('data-changed');
+    }
+  });
+
+  ipcMain.handle('add-knowledge-source', async () => {
+    const result = await dialog.showOpenDialog(window, {
+      title: 'Tilføj kilde',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Tekst', extensions: ['md', 'txt'] }],
+    });
+    if (result.canceled || !result.filePaths.length) return { added: 0, problems: [] };
+
+    let added = 0;
+    const problems = [];
+    for (const filePath of result.filePaths) {
+      try {
+        const text = fs.readFileSync(filePath, 'utf8');
+        const title = path.basename(filePath).replace(/\.(md|txt)$/i, '');
+        const outcome = knowledge.importSource(database, { title, kind: path.extname(filePath).slice(1) || 'text', fileName: path.basename(filePath), text });
+        if (outcome.added) added++;
+        else problems.push(`${path.basename(filePath)}: ${outcome.reason}`);
+      } catch (err) {
+        problems.push(`${path.basename(filePath)}: ${err.message}`);
+      }
+    }
+    notifyPage('data-changed');
+    embedPending(); // runs in the background; the page updates as chunks finish
+    return { added, problems };
+  });
+
+  ipcMain.handle('remove-knowledge-source', (_event, id) => {
+    db.removeKnowledgeSource(database, id);
+    notifyPage('data-changed');
+  });
+
+  ipcMain.handle('ask-coach', async (_event, question, includeStats) => {
+    db.addCoachMessage(database, { role: 'user', content: question });
+    notifyPage('data-changed');
+    try {
+      const data = buildData(database, {}, { followPlan: settings.followPlan });
+      const { answer, citations } = await coach.ask(database, question, {
+        embedModel: settings.coachEmbedModel,
+        chatModel: settings.coachChatModel,
+        includeStats,
+        data,
+        onToken: (piece) => notifyPage('coach-token', piece),
+      });
+      db.addCoachMessage(database, { role: 'assistant', content: answer, citations });
+    } catch (err) {
+      db.addCoachMessage(database, { role: 'error', content: err.message });
+    }
+    notifyPage('data-changed');
+  });
+
+  ipcMain.handle('clear-coach-chat', () => {
+    db.clearCoachMessages(database);
+    notifyPage('data-changed');
+  });
+
+  // Citations can link to a source video. Only ever open plain https links.
+  ipcMain.handle('open-external-link', (_event, url) => {
+    if (typeof url === 'string' && /^https:\/\//.test(url)) shell.openExternal(url);
+  });
 }
 
 app.whenReady().then(async () => {
-  settings = loadSettings({ statsDir: config.default_stats_dir_windows, autoUpdate: true, followPlan: false });
+  settings = loadSettings({
+    statsDir: config.default_stats_dir_windows, autoUpdate: true, followPlan: false,
+    // Defaults picked for a 16 GB VRAM card. Changeable later without losing
+    // existing embeddings of the model that matches embedding_model per chunk.
+    coachEmbedModel: 'nomic-embed-text', coachChatModel: 'qwen2.5:14b',
+  });
   // The database file lives in %APPDATA%\Aim Tracker, not in the KovaaK's folder.
   database = db.openDatabase(path.join(app.getPath('userData'), 'aim-tracker.sqlite'));
 
@@ -194,6 +344,9 @@ app.whenReady().then(async () => {
   watchStatsFolder();
   startUpdater();
   cachePlaylists(false); // runs in the background; the page updates when done
+
+  refreshOllamaStatus().then(() => embedPending());
+  setInterval(() => refreshOllamaStatus().then(() => embedPending()), 60000); // in case Ollama is started later
 });
 
 app.on('window-all-closed', () => app.quit());
