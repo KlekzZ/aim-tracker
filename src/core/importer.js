@@ -42,4 +42,22 @@ async function importFolder(database, statsDir) {
   return summary;
 }
 
-module.exports = { importFolder };
+// Works out the in-run details for runs stored before that feature existed,
+// by reading their files again. Still read-only. A file that is gone gets
+// an empty result, so we don't keep looking for it on every start.
+async function backfillDetails(database, statsDir) {
+  let filled = 0;
+  for (const { id, fileName } of db.runsWithoutDetails(database)) {
+    try {
+      const text = await fs.readFile(path.join(statsDir, fileName), 'utf8');
+      const parsed = parseStatsFile(fileName, text);
+      db.setRunDetails(database, id, parsed.ok ? parsed.run.details : {});
+      filled++;
+    } catch {
+      db.setRunDetails(database, id, {});
+    }
+  }
+  return filled;
+}
+
+module.exports = { importFolder, backfillDetails };

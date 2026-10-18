@@ -8,7 +8,9 @@ const plan = require('../core/plan');
 const program = require('../core/program');
 const follow = require('../core/follow');
 const coachPlan = require('../core/coach-plan');
-const { cmPer360 } = require('../core/sens');
+const analysis = require('../core/run-analysis');
+const { recommendSens } = require('../core/sens-advice');
+const { cmPer360, sensForCm } = require('../core/sens');
 
 const appRoot = path.join(__dirname, '..', '..');
 const readJson = (...parts) => JSON.parse(fs.readFileSync(path.join(appRoot, ...parts), 'utf8'));
@@ -43,6 +45,26 @@ const allPlanCodes = [...new Set([
 const normalizeName = (name) => name.trim().replace(/\s+/g, ' ').toLowerCase();
 const fingertipMax = new Map(viscose.benchmarks.flatMap((b) => b.scenarios
   .filter((s) => s.max_cm360).map((s) => [normalizeName(s.name), s.max_cm360])));
+
+// Every benchmark scenario's rank ladder (for PBs and rank-ups) and its
+// subcategory plus a reference score (for comparing sens across scenarios).
+// Voltaic Intermediate is measured against Platinum, Novice against Gold
+// (its top rank), Viscose against its reference rank.
+const ladders = new Map();
+const scenarioInfo = new Map();
+for (const s of thresholds.scenarios) {
+  const ranks = s.tier === 'Novice' ? thresholds.novice_ranks : thresholds.intermediate_ranks;
+  ladders.set(normalizeName(s.name), { thresholds: s.thresholds, ranks });
+  const reference = s.tier === 'Novice' ? s.thresholds[s.thresholds.length - 1] : s.thresholds[0];
+  scenarioInfo.set(normalizeName(s.name), { subcategory: s.subcategory, reference });
+}
+for (const b of viscose.benchmarks) {
+  const refIndex = Math.max(0, b.ranks.indexOf(b.reference_rank));
+  for (const s of b.scenarios) {
+    ladders.set(normalizeName(s.name), { thresholds: s.thresholds, ranks: b.ranks });
+    scenarioInfo.set(normalizeName(s.name), { subcategory: s.subcategory, reference: s.thresholds[refIndex] });
+  }
+}
 
 // The sens settings we show per run, and highlight when they change.
 const SENS_KEYS = ['sensScale', 'sens', 'dpi'];
@@ -89,6 +111,17 @@ function playlistForScenario(name) {
   return benchmark ? { name: benchmark.name, code: benchmark.share_code } : null;
 }
 
+// Which sens to play a scenario on, from what has worked for you before
+// (src/core/sens-advice.js), converted to your game's sens value.
+function sensTip(name, runs) {
+  const key = normalizeName(name);
+  const meta = scenarioInfo.get(key) || {};
+  const advice = recommendSens({ name, subcategory: meta.subcategory, maxCm360: fingertipMax.get(key) }, runs, scenarioInfo, normalizeName);
+  if (!advice) return null;
+  const latest = [...runs].reverse().find((run) => run.cm360 !== null);
+  return { ...advice, sens: latest ? sensForCm(advice.cm, latest.sensScale, latest.dpi) : null };
+}
+
 // Marks scenarios you have never played. The first time KovaaK's sees a
 // scenario it has to fetch it, and opening the playlist it belongs to gets
 // them all at once, which is more reliable than one deep link at a time.
@@ -100,6 +133,7 @@ function markNewScenarios(session, runs) {
   for (const part of session.progress.parts) {
     if (!part.progress) continue;
     for (const item of part.progress.items) {
+      item.sensTip = sensTip(item.name, runs);
       item.isNew = !everPlayed.has(normalizeName(item.name));
       if (!item.isNew) continue;
       const playlist = playlistForScenario(item.name);
@@ -158,13 +192,17 @@ function followSession(database, today, runs, playlists, logs) {
 // first", a suggestion you can say yes or no to, or nothing while you are
 // already following one. The suggestion itself is built in code, so it works
 // with or without Ollama (see src/core/coach-plan.js).
-function buildProposal(database, summaries, todayIso) {
+function buildProposal(database, summaries, todayIso, viscoseEasier, runs) {
   const active = activeProgram(database);
+  const report = active ? coachPlan.programReport(active, summaries, runs, todayIso, normalizeName) : null;
   if (active) {
     const state = db.getState(database, 'follow');
     const finished = state && state.index >= active.passes.length;
-    if (!finished) return { status: 'active', name: active.name, kind: active.kind };
+    if (!finished) return { status: 'active', name: active.name, kind: active.kind, report };
   }
+  // The last programme's result, shown with the next suggestion.
+  const history = db.getState(database, 'programHistory') || [];
+  const lastReport = report || (history.length ? history[history.length - 1] : null);
 
   const readiness = coachPlan.benchmarkReadiness(summaries, todayIso);
   if (!readiness.ready) {
@@ -174,15 +212,16 @@ function buildProposal(database, summaries, todayIso) {
       done: readiness.total - readiness.missing.length,
       total: readiness.total,
       playlistCode: thresholds.share_codes.Intermediate,
+      lastReport,
     };
   }
 
   const dismissed = db.getState(database, 'proposalDismissed');
   const kind = (dismissed && dismissed.nextKind) || 'weakness';
-  const suggestion = coachPlan.generateProgram(kind, summaries, thresholds.share_codes.Intermediate);
-  if (!suggestion) return { status: 'none' };
+  const suggestion = coachPlan.generateProgram(kind, summaries, thresholds.share_codes.Intermediate, { viscose: viscoseEasier });
+  if (!suggestion) return { status: 'none', lastReport };
   if (dismissed && dismissed.until > todayIso && dismissed.kind === suggestion.kind) {
-    return { status: 'dismissed', until: dismissed.until };
+    return { status: 'dismissed', until: dismissed.until, lastReport };
   }
 
   const rationale = db.getState(database, 'proposalRationale');
@@ -191,7 +230,20 @@ function buildProposal(database, summaries, todayIso) {
     program: suggestion,
     stale: readiness.stale,
     rationale: rationale && rationale.id === suggestion.id ? rationale.text : null,
+    lastReport,
   };
+}
+
+// Is a scenario really getting better, or is it noise? (src/core/run-analysis.js)
+function withTrends(summaries, runs) {
+  const scores = new Map();
+  for (const run of runs) {
+    if ((run.mode || '').toLowerCase() !== 'challenge') continue;
+    const key = normalizeName(run.scenario);
+    if (!scores.has(key)) scores.set(key, []);
+    scores.get(key).push(run.score);
+  }
+  return summaries.map((s) => ({ ...s, trend: analysis.trendSignal(scores.get(normalizeName(s.name)) || []) }));
 }
 
 function buildData(database, extra, options = {}) {
@@ -200,6 +252,11 @@ function buildData(database, extra, options = {}) {
   const logs = db.sessionLogs(database);
   const today = plan.todaysTraining(new Date(), config, shareCodes);
   const playlists = db.allPlaylists(database);
+  const viscoseData = viscose.benchmarks.map((benchmark) => ({
+    id: benchmark.id, name: benchmark.name, ranks: benchmark.ranks, referenceRank: benchmark.reference_rank,
+    shareCode: benchmark.share_code, scenarios: withTrends(stats.benchmarkSummaries(runs, benchmark), runs),
+  }));
+  const records = analysis.findRecords(runs, ladders, normalizeName);
 
   return {
     today,
@@ -211,13 +268,13 @@ function buildData(database, extra, options = {}) {
     passes: currentPasses(database).map((pass, index) => ({ index, title: `${program.passTitle(pass)}: ${pass.label}` })),
     activeProgram: activeProgram(database),
     latestRun: runs[runs.length - 1] || null,
-    scenarios: summaries,
+    scenarios: withTrends(summaries, runs),
     radar: stats.radarData(summaries),
-    proposal: buildProposal(database, summaries, today.date),
+    proposal: buildProposal(database, summaries, today.date, viscoseData[0], runs),
+    records: records.slice(0, 20),
+    week: analysis.weeklySummary(runs, records, today.date, normalizeName),
     voltaicShareCodes: thresholds.share_codes,
-    viscose: viscose.benchmarks.map((benchmark) => {
-      return { id: benchmark.id, name: benchmark.name, ranks: benchmark.ranks, referenceRank: benchmark.reference_rank, shareCode: benchmark.share_code, scenarios: stats.benchmarkSummaries(runs, benchmark) };
-    }),
+    viscose: viscoseData,
     sessions: stats.groupSessions(runs, config.session_gap_minutes),
     runs: [...runs].reverse(), // newest first for the log
     problems: db.allProblems(database),
@@ -246,10 +303,20 @@ function markFollowDone(database) {
   if (state) db.setState(database, 'follow', follow.markDone(state, currentPasses(database), plan.isoDay(new Date())));
 }
 
+// Keeps the result of the programme you leave, so the coach can learn from
+// what worked. Only the report is kept, not the whole programme.
+function archiveProgram(database, report) {
+  if (!report) return;
+  const history = db.getState(database, 'programHistory') || [];
+  history.push({ ...report, endedAt: new Date().toISOString() });
+  db.setState(database, 'programHistory', history.slice(-10));
+}
+
 // Saying yes to a suggestion: it becomes the programme you follow, starting
 // at its first pass today.
-function acceptProposal(database, program) {
-  db.setState(database, 'program', program);
+function acceptProposal(database, program, report) {
+  archiveProgram(database, report);
+  db.setState(database, 'program', { ...program, startedAt: new Date().toISOString() });
   db.setState(database, 'follow', follow.startState(0, plan.isoDay(new Date())));
   db.setState(database, 'proposalDismissed', null);
 }
@@ -267,7 +334,8 @@ function undismissProposal(database) {
 }
 
 // Back to the built-in 12-week plan.
-function clearProgram(database) {
+function clearProgram(database, report) {
+  archiveProgram(database, report);
   db.setState(database, 'program', null);
   db.setState(database, 'follow', follow.startState(0, plan.isoDay(new Date())));
 }

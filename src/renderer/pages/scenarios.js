@@ -46,6 +46,47 @@ function scenarioRuns(data, name) {
     .reverse();
 }
 
+// Is it real progress or just a good day? The last 3 runs against the
+// spread of the 10 before them (src/core/run-analysis.js trendSignal).
+function trendBadge(trend) {
+  if (!trend) return '';
+  if (trend.status === 'few') return `<span class="pill" title="Der skal mindst 6 runs til, før appen kan skelne fremgang fra tilfældigheder.">${trend.runs || 0} runs, for få til en trend</span>`;
+  const share = `${trend.diff >= 0 ? '+' : ''}${num(trend.percent * 100, 1)} %`;
+  const title = `Median af de sidste 3 runs (${num(trend.recentMedian, 1)}) mod de 10 før (${num(trend.earlierMedian, 1)}). Normal udsving: ±${num(trend.noise, 1)}.`;
+  if (trend.status === 'up') return `<span class="pill good" title="${esc(title)}">Reel fremgang ${share}</span>`;
+  if (trend.status === 'down') return `<span class="pill warning" title="${esc(title)}">Går ned ${share}</span>`;
+  return `<span class="pill" title="${esc(title)}">Stabil (ændringen er inden for normal udsving)</span>`;
+}
+
+// What happened inside your latest run, from the per-kill rows. Tracking
+// scenarios have no kills, so they get nothing here.
+function runAnalysis(runs) {
+  const latest = [...runs].reverse().find((r) => r.details && r.details.kills > 1 && r.details.curve);
+  if (!latest) return '';
+  const d = latest.details;
+  const notes = [];
+  const drop = d.firstHalf.kills ? (d.secondHalf.kills - d.firstHalf.kills) / d.firstHalf.kills : 0;
+  if (drop <= -0.1) notes.push(`Du får ${num(-drop * 100)} % færre kills i anden halvdel. Træthed eller spænding? Prøv at holde grebet løst hele vejen.`);
+  else if (drop >= 0.1) notes.push(`Du starter langsomt: ${num(drop * 100)} % flere kills i anden halvdel. En kort opvarmning før kan hjælpe.`);
+  else notes.push('Dit tempo holder hele runnet igennem.');
+  if (d.firstHalf.accuracy !== null && d.secondHalf.accuracy !== null && d.firstHalf.accuracy - d.secondHalf.accuracy > 0.05) {
+    notes.push('Din accuracy falder i anden halvdel.');
+  }
+  if (d.slowKills >= 3) notes.push(`${d.slowKills} gange tog et kill over 3 gange så lang tid som normalt. Det er dér, du mister flowet.`);
+  return `
+    <div>
+      <h3>Inde i dit seneste run <span class="muted">· ${esc(dateTime(latest.playedAt))}</span></h3>
+      <div class="kpis">
+        <div class="kpi"><span>1. halvdel</span><b>${d.firstHalf.kills}</b><small>kills · ${pct(d.firstHalf.accuracy)}</small></div>
+        <div class="kpi"><span>2. halvdel</span><b>${d.secondHalf.kills}</b><small>kills · ${pct(d.secondHalf.accuracy)}</small></div>
+        <div class="kpi" title="Tid mellem kills, median"><span>Tid pr. kill</span><b>${num(d.medianGap, 2)} s</b></div>
+        <div class="kpi" title="Hvor meget tiden mellem kills svinger. Lavere er mere stabilt."><span>Udsving</span><b>${num(d.steadiness * 100)} %</b></div>
+      </div>
+      <div class="chart-box short"><canvas id="curve-chart"></canvas></div>
+      <ul class="notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>
+    </div>`;
+}
+
 function detailPanel(s, runs) {
   const ladder = s.thresholds.map((t, i) => `
     <div class="${s.best !== null && s.best >= t ? 'reached' : ''}">
@@ -74,6 +115,7 @@ function detailPanel(s, runs) {
         <div class="secondary small">${subtitle}${esc(s.category)} / ${esc(s.subcategory)}</div>
         <h2>${esc(s.name)}</h2>
         ${s.retired ? '<span class="pill">Udgået i S5.5</span> ' : ''}${rankBadge(s.rank)} ${s.nextRank ? `<span class="pill">Næste: ${esc(s.nextRank)} ${num(s.nextThreshold)}</span>` : ''}
+        <div class="pill-row">${trendBadge(s.trend)}</div>
       </div>
       <div><button class="btn small" data-open-scenario="${esc(s.name)}">${icon('bolt', 15)}Spil i KovaaK's</button></div>
       ${tooSlow}
@@ -89,6 +131,12 @@ function detailPanel(s, runs) {
         <h3>Score over tid</h3>
         ${runs.length ? '<div class="chart-box"><canvas id="trend-chart"></canvas></div>' : '<div class="empty">Ingen runs på dette scenarie endnu.</div>'}
       </div>
+      ${runAnalysis(runs)}
+      ${runs.filter((r) => r.accuracy !== null).length >= 3 ? `<div>
+        <h3>Præcision mod score</h3>
+        <p class="muted small">Hver prik er et run. Ligger dine bedste scores ved høj eller lav accuracy? Lav accuracy og høj score betyder, at du spammer. Høj accuracy og lav score betyder, at du kan tage mere tempo.</p>
+        <div class="chart-box"><canvas id="scatter-chart"></canvas></div>
+      </div>` : ''}
     </div>`;
 }
 
@@ -172,4 +220,7 @@ function renderScenarios(data) {
   }));
 
   if (runs.length) drawTrend('trend-chart', runs, selected);
+  const analysed = [...runs].reverse().find((r) => r.details && r.details.kills > 1 && r.details.curve);
+  if (analysed) drawKillCurve('curve-chart', analysed.details);
+  if (document.getElementById('scatter-chart')) drawScatter('scatter-chart', runs);
 }

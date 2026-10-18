@@ -1,9 +1,10 @@
-// Talks to KovaaK's in the two ways the owner approved:
+// Talks to KovaaK's in the ways the owner approved:
 // 1. Looks up public playlist contents by share code on kovaaks.com.
 //    This is the same unofficial API the kovaaks.com website uses, so it
 //    may change. Results are cached in the database (see db.savePlaylist),
 //    so we only ask once per playlist and the app works offline after that.
-// 2. Opens KovaaK's official deep links (steam://...). Steam starts the game
+// 2. Searches the public catalog of playlists and scenarios (the Katalog page).
+// 3. Opens KovaaK's official deep links (steam://...). Steam starts the game
 //    on the playlist or scenario. Nothing is written to the game folder.
 const { net, shell } = require('electron');
 
@@ -46,4 +47,50 @@ function openInKovaaks(target) {
   shell.openExternal(url);
 }
 
-module.exports = { fetchPlaylist, openInKovaaks };
+
+// ---------- Catalog: search all public playlists and scenarios ----------
+// Only the search words are sent, never anything about you.
+
+const BACKEND = 'https://kovaaks.com/webapp-backend';
+const MAX_RESULTS = 20;
+
+function cleanQuery(query) {
+  const text = String(query || '').trim().replace(/\s+/g, ' ');
+  if (!text || text.length > 60) throw new Error('Skriv 1 til 60 tegn.');
+  return text;
+}
+
+async function getJson(url) {
+  const response = await net.fetch(url, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) throw new Error(`kovaaks.com svarede ${response.status}`);
+  return response.json();
+}
+
+async function searchPlaylists(query) {
+  const body = await getJson(`${BACKEND}/playlist/playlists?page=0&max=${MAX_RESULTS}&search=${encodeURIComponent(cleanQuery(query))}`);
+  return (body.data || [])
+    .filter((p) => SHARE_CODE.test(p.playlistCode || ''))
+    .map((p) => ({
+      name: p.playlistName,
+      code: p.playlistCode,
+      author: p.webappUsername || p.steamAccountName || null,
+      subscribers: p.subscribers || 0,
+      aimType: p.aimType || null,
+      minutes: p.playlistDuration || null,
+      scenarios: (p.scenarioList || []).map((s) => ({ name: s.scenarioName, playCount: s.playCount || 1, aimType: s.aimType || null })),
+    }));
+}
+
+async function searchScenarios(query) {
+  const body = await getJson(`${BACKEND}/scenario/popular?page=0&max=${MAX_RESULTS}&scenarioNameSearch=${encodeURIComponent(cleanQuery(query))}`);
+  return (body.data || []).map((s) => ({
+    name: s.scenarioName,
+    aimType: (s.scenario && s.scenario.aimType) || null,
+    description: (s.scenario && s.scenario.description) || '',
+    authors: (s.scenario && s.scenario.authors) || [],
+    plays: (s.counts && s.counts.plays) || 0,
+    entries: (s.counts && s.counts.entries) || 0,
+  }));
+}
+
+module.exports = { fetchPlaylist, openInKovaaks, searchPlaylists, searchScenarios };

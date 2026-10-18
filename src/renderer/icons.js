@@ -18,6 +18,7 @@ const ICON_PATHS = {
   chat: '<path d="M4 4h16v12H8l-4 4z"/>',
   book: '<path d="M4 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v15l-7-3-7 3z"/>',
   send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>',
 };
 

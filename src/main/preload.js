@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('api', {
   explainProposal: () => ipcRenderer.invoke('explain-proposal'),
   // target: { type: 'playlist', code } or { type: 'scenario', name }
   openInKovaaks: (target) => ipcRenderer.invoke('open-in-kovaaks', target),
+  // kind: 'playlists' or 'scenarios'. Searches kovaaks.com (cached offline).
+  catalogSearch: (kind, query) => ipcRenderer.invoke('catalog-search', kind, query),
   onDataChanged: (callback) => ipcRenderer.on('data-changed', () => callback()),
   onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_event, status) => callback(status)),
 

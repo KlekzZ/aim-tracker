@@ -5,7 +5,14 @@ Lokal Electron-app, der læser dine KovaaK's `Stats.csv`-filer og hjælper dig m
 - Appen **læser kun** fra KovaaK's-mappen. Den skriver, flytter og sletter aldrig noget dér og rører ikke spillet.
 - "Åbn i KovaaK's"-knapperne bruger KovaaK's' officielle `steam://`-links.
 - Data gemmes i `%APPDATA%\Aim Tracker\` (database `aim-tracker.sqlite` og `settings.json`).
-- Netværk: kun opdateringer fra GitHub Releases, opslag af playlister på kovaaks.com, og Ollama på 127.0.0.1. Der sendes ingen data om dig.
+- Netværk: kun opdateringer fra GitHub Releases, opslag og søgning af playlister og scenarier på kovaaks.com (Katalog-siden sender kun dine søgeord), og Ollama på 127.0.0.1. Der sendes ingen data om dig.
+
+## Hvad den kan
+
+- **I dag:** dit næste pas med en tjekliste, et sens-forslag (cm/360) pr. scenarie ud fra hvad der har givet dig de bedste resultater før, nye rekorder og rank-ups, en ugeopsummering, og hvordan dit program går.
+- **Programmer:** Coach foreslår et 3-ugers program ud fra dine svageste underkategorier. Fredag er en Viscose-dag (hvis du har Viscose-resultater), lørdag er testdag med de samme scenarier hver uge, og sidste dag er en ny benchmark-test. Resultatet gemmes, så næste forslag kan se, hvad der virkede.
+- **Scenarier:** ranks, score over tid, om fremgangen er reel eller bare udsving, hvad der skete inde i dit seneste run (tempo, accuracy pr. halvdel, tabte kills), og præcision mod score.
+- **Katalog:** søg i alle offentlige playlister og scenarier på kovaaks.com og åbn dem direkte i KovaaK's.
 
 ## Coach (lokal AI)
 

@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { benchmarkReadiness, weaknessProfile, generateProgram, WEEKS, TRAINING_DAYS } = require('../src/core/coach-plan');
+const { benchmarkReadiness, weaknessProfile, generateProgram, programReport, WEEKS, TRAINING_DAYS } = require('../src/core/coach-plan');
 const stats = require('../src/core/stats');
 const { passProgress } = require('../src/core/program');
 
@@ -114,4 +114,63 @@ test('program: general kind covers all three categories', () => {
 test('program: returns null when there is too little to plan from', () => {
   const almostEmpty = summariesWith({ Control: 0.6, Reactive: null, Evasive: null, Speed: null, Static: null, Linear: null, Dynamic: null, Precise: null, Stability: null });
   assert.equal(generateProgram('weakness', almostEmpty, 'code'), null);
+});
+
+const viscoseData = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'viscose_thresholds.json'), 'utf8'));
+
+test('program: Saturday in weeks 1-2 is a test day with the same scenarios, 3 runs each', () => {
+  const program = generateProgram('weakness', summariesWith({ Control: 0.6, Reactive: 0.7, Evasive: 0.75 }), 'KovaaKsCarryingNarrowCt');
+  const tests = program.passes.filter((p) => p.testDay);
+  assert.equal(tests.length, WEEKS - 1);
+  assert.equal(program.testScenarios.length, 3);
+  for (const pass of tests) {
+    assert.deepEqual(pass.parts[0].scenarios.map((s) => s.name), program.testScenarios);
+    assert.ok(pass.parts[0].scenarios.every((s) => s.playCount === 3));
+  }
+  assert.equal(program.startProfile.length, 9);
+});
+
+test('program: Friday is a Viscose day when you have Viscose results', () => {
+  const easier = viscoseData.benchmarks[0];
+  // Play one scenario in each subcategory, scored low in two of them.
+  const seen = new Set();
+  const runs = [];
+  for (const s of easier.scenarios) {
+    if (seen.has(s.subcategory)) continue;
+    seen.add(s.subcategory);
+    const factor = runs.length < 2 ? 0.3 : 0.9;
+    runs.push({ scenario: s.name, mode: 'Challenge', score: s.thresholds[0] * factor, playedAt: '2026-10-17T18:00:00', cm360: 40 });
+  }
+  const viscose = { name: easier.name, ranks: easier.ranks, referenceRank: easier.reference_rank, scenarios: stats.benchmarkSummaries(runs, easier) };
+  const program = generateProgram('weakness', summariesWith({ Control: 0.6 }), 'code', { viscose });
+  const friday = program.passes.find((p) => p.day === 'Fri');
+  assert.match(friday.label, /^Viscose/);
+  assert.match(program.summary, /Viscose-dag/);
+  const names = new Set(easier.scenarios.map((s) => s.name));
+  assert.ok(friday.parts[0].scenarios.every((s) => names.has(s.name) || s.playCount === 1));
+
+  // Without Viscose results it falls back to the mixed day.
+  const plain = generateProgram('weakness', summariesWith({ Control: 0.6 }), 'code', {});
+  assert.match(plain.passes.find((p) => p.day === 'Fri').label, /^Blandet/);
+});
+
+test('report: compares subcategories and test-scenario medians with the start', () => {
+  const before = summariesWith({ Control: 0.6 });
+  const program = { ...generateProgram('weakness', before, 'code'), startedAt: '2026-10-05T10:00:00' };
+  const name = program.testScenarios[0];
+  const runs = [
+    { scenario: name, mode: 'Challenge', score: 100, playedAt: '2026-10-01T10:00:00' },
+    { scenario: name, mode: 'Challenge', score: 110, playedAt: '2026-10-11T10:00:00' },
+    { scenario: name, mode: 'Challenge', score: 120, playedAt: '2026-10-11T10:05:00' },
+    { scenario: name, mode: 'Challenge', score: 130, playedAt: '2026-10-11T10:10:00' },
+  ];
+  const report = programReport(program, summariesWith({ Control: 0.7 }), runs, '2026-10-12', (n) => n.toLowerCase());
+  const control = report.subcategories.find((s) => s.subcategory === 'Control');
+  assert.ok(Math.abs(control.change - 0.1) < 0.001);
+  assert.equal(control.focus, true);
+  assert.equal(report.tests[0].before, 100);
+  assert.deepEqual(report.tests[0].weeks, [120, null, null]);
+  assert.ok(Math.abs(report.tests[0].change - 0.2) < 0.001);
+  assert.equal(report.week, 2);
+  assert.equal(programReport({ ...program, startedAt: undefined, createdAt: undefined }, before, runs, '2026-10-12', (n) => n), null);
 });

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const db = require('../core/db');
-const { importFolder } = require('../core/importer');
+const { importFolder, backfillDetails } = require('../core/importer');
 const {
   buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone,
   acceptProposal, rejectProposal, undismissProposal, clearProgram,
@@ -35,6 +35,7 @@ function notifyPage(channel, payload) {
 async function scan() {
   try {
     const summary = await importFolder(database, settings.statsDir);
+    await backfillDetails(database, settings.statsDir); // older runs, once
     lastScan = { at: new Date().toISOString(), summary, error: null };
   } catch (err) {
     lastScan = { at: new Date().toISOString(), summary: null, error: `Kunne ikke læse mappen: ${err.message}` };
@@ -237,14 +238,34 @@ function registerIpc() {
   });
   ipcMain.handle('open-in-kovaaks', (_event, target) => kovaaks.openInKovaaks(target || {}));
 
+  // Katalog: search kovaaks.com for playlists or scenarios. The last 30
+  // searches are cached, so they still work offline.
+  ipcMain.handle('catalog-search', async (_event, kind, query) => {
+    const type = kind === 'scenarios' ? 'scenarios' : 'playlists';
+    const key = `${type}:${String(query || '').trim().toLowerCase()}`;
+    const cache = db.getState(database, 'catalogCache') || {};
+    try {
+      const results = type === 'scenarios' ? await kovaaks.searchScenarios(query) : await kovaaks.searchPlaylists(query);
+      cache[key] = { at: new Date().toISOString(), results };
+      const keep = Object.entries(cache).sort((a, b) => b[1].at.localeCompare(a[1].at)).slice(0, 30);
+      db.setState(database, 'catalogCache', Object.fromEntries(keep));
+      return { results, cachedAt: null };
+    } catch (err) {
+      if (cache[key]) return { results: cache[key].results, cachedAt: cache[key].at };
+      return { results: [], error: err.message };
+    }
+  });
+
   // ---------- Programme suggestions on the home screen ----------
 
   ipcMain.handle('accept-proposal', () => {
     // Rebuild the suggestion here instead of trusting what the page sends,
     // so the programme that gets saved is always one this code generated.
-    const proposal = buildData(database, {}, { followPlan: settings.followPlan }).proposal;
+    const data = buildData(database, {}, { followPlan: settings.followPlan });
+    const proposal = data.proposal;
     if (proposal.status !== 'ready') return false;
-    acceptProposal(database, proposal.program);
+    // A finished programme's result goes into the history before the new one starts.
+    acceptProposal(database, proposal.program, data.activeProgram ? proposal.lastReport : null);
     settings.followPlan = true; // a programme is only useful if you follow it
     saveSettings(settings);
     notifyPage('data-changed');
@@ -262,9 +283,18 @@ function registerIpc() {
   });
 
   ipcMain.handle('clear-program', () => {
-    clearProgram(database);
+    const data = buildData(database, {}, { followPlan: settings.followPlan });
+    clearProgram(database, data.activeProgram ? (data.proposal.report || data.proposal.lastReport) : null);
     notifyPage('data-changed');
   });
+
+  // What the last programme did, in one line for the model.
+  function lastProgramLine(report) {
+    if (!report) return '';
+    const changes = report.subcategories.filter((s) => s.focus)
+      .map((s) => `${s.subcategory} ${s.change >= 0 ? '+' : ''}${Math.round(s.change * 100)} point`).join(', ');
+    return `Mit sidste program var "${report.programName}", og det gav: ${changes || 'ingen målbar ændring'}. `;
+  }
 
   // Asks the local model why this programme makes sense, using your sources.
   ipcMain.handle('explain-proposal', async () => {
@@ -274,6 +304,7 @@ function registerIpc() {
     const weak = p.profile.map((row) => `${row.subcategory} (${Math.round(row.percent * 100)} % af Platinum)`).join(', ');
     const question = `Jeg har fået foreslået dette træningsprogram: "${p.name}". `
       + `Mine svageste underkategorier er: ${weak}. `
+      + lastProgramLine(data.proposal.lastReport)
       + 'Forklar kort (højst 4 sætninger), hvorfor det giver mening at træne netop det, og hvad jeg skal holde øje med undervejs.';
 
     db.setState(database, 'proposalRationale', { id: p.id, text: 'Spørger Coach...' });

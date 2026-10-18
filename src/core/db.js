@@ -103,7 +103,17 @@ function openDatabase(filePath) {
   const db = new DatabaseSync(filePath);
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+// Columns added after the first release. CREATE TABLE IF NOT EXISTS doesn't
+// add columns to a table that already exists, so we add them here.
+function migrate(db) {
+  const columns = db.prepare('PRAGMA table_info(runs)').all().map((c) => c.name);
+  // What happened inside the run, as JSON (see run-analysis.js). NULL means
+  // "not worked out yet", so older runs get filled in on the next start.
+  if (!columns.includes('details')) db.exec('ALTER TABLE runs ADD COLUMN details TEXT');
 }
 
 function isFileUnchanged(db, fileName, size, mtimeMs) {
@@ -132,15 +142,24 @@ function insertRun(db, run, fileHash) {
       file_hash, file_name, scenario, mode, played_at, score,
       kills, hits, misses, accuracy,
       sens_scale, sens, vert_sens, dpi, fov, fov_scale, resolution, width, height,
-      avg_fps, game_version
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      avg_fps, game_version, details
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     fileHash, run.fileName, run.scenario, run.mode, run.playedAt, run.score,
     run.kills, run.hits, run.misses, run.accuracy,
     run.sensScale, run.sens, run.vertSens, run.dpi, run.fov, run.fovScale, run.resolution, run.width, run.height,
-    run.avgFps, run.gameVersion
+    run.avgFps, run.gameVersion, run.details ? JSON.stringify(run.details) : null
   );
   return result.changes > 0;
+}
+
+// Runs stored before the in-run analysis existed.
+function runsWithoutDetails(db) {
+  return db.prepare('SELECT id, file_name AS fileName FROM runs WHERE details IS NULL').all();
+}
+
+function setRunDetails(db, id, details) {
+  db.prepare('UPDATE runs SET details = ? WHERE id = ?').run(JSON.stringify(details), id);
 }
 
 // Column names are renamed to the same camelCase names the parser uses,
@@ -151,9 +170,9 @@ function allRuns(db) {
       kills, hits, misses, accuracy,
       sens_scale AS sensScale, sens, vert_sens AS vertSens, dpi,
       fov, fov_scale AS fovScale, resolution, width, height,
-      avg_fps AS avgFps, game_version AS gameVersion
+      avg_fps AS avgFps, game_version AS gameVersion, details
     FROM runs ORDER BY played_at
-  `).all();
+  `).all().map((row) => ({ ...row, details: row.details ? JSON.parse(row.details) : null }));
 }
 
 function allProblems(db) {
@@ -274,6 +293,8 @@ module.exports = {
   setProblem,
   clearProblem,
   insertRun,
+  runsWithoutDetails,
+  setRunDetails,
   allRuns,
   allProblems,
   savePlaylist,

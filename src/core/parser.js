@@ -1,6 +1,7 @@
 // Parses one KovaaK's "Stats.csv" file into a plain run object.
 // This file only works on text that was already read from disk, so it can
 // never touch the KovaaK's folder itself. That keeps it easy to test.
+const { analyzeKills } = require('./run-analysis');
 
 // File name looks like: "<Scenario> - Challenge - 2026.10.17-12.08.07 Stats.csv".
 // The scenario part is greedy because scenario names can contain " - ".
@@ -39,6 +40,28 @@ function toNumber(value) {
   if (value === undefined || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+// The per-kill table at the top of the file: one row per kill with its time
+// of day, time-to-kill, shots and hits. Tracking scenarios have no rows
+// (the target never dies), so this can be empty.
+function parseKillRows(text) {
+  const lines = text.split(/\r?\n/);
+  if (!/^Kill #,Timestamp,/.test(lines[0] || '')) return [];
+  const rows = [];
+  for (const line of lines.slice(1)) {
+    if (!line.trim()) break; // the table ends at the first blank line
+    const cells = line.split(',');
+    const shots = toNumber(cells[5]);
+    const hits = toNumber(cells[6]);
+    rows.push({
+      time: cells[1],
+      ttk: toNumber(String(cells[4] || '').replace(/s$/, '')),
+      shots: shots ?? 0,
+      hits: hits ?? 0,
+    });
+  }
+  return rows;
 }
 
 function parseResolution(value) {
@@ -89,8 +112,10 @@ function parseStatsFile(fileName, text) {
       height,
       avgFps: toNumber(values['Avg FPS']),
       gameVersion: values['Game Version'] || null,
+      // What happened inside the run (see run-analysis.js).
+      details: analyzeKills(parseKillRows(text), values['Challenge Start'], nameInfo.playedAt),
     },
   };
 }
 
-module.exports = { parseStatsFile, parseFileName };
+module.exports = { parseStatsFile, parseFileName, parseKillRows };

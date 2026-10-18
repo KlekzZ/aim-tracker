@@ -39,4 +39,16 @@ function cmPer360(sens, sensScale, dpi) {
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
-module.exports = { cmPer360 };
+// The other way round: which in-game sens gives this cm/360 with your scale
+// and DPI. Rounded to 2 decimals, which is what you type into KovaaK's.
+function sensForCm(cm, sensScale, dpi) {
+  if (!cm || !dpi || !sensScale) return null;
+  const scale = sensScale.trim().toLowerCase();
+  if (scale === 'cm/360') return round1(cm);
+  if (scale === 'in/360' || scale === 'inches/360') return Math.round((cm / INCH_CM) * 100) / 100;
+  const yaw = YAW[scale];
+  if (!yaw) return null;
+  return Math.round(((360 * INCH_CM) / (yaw * dpi * cm)) * 100) / 100;
+}
+
+module.exports = { cmPer360, sensForCm };

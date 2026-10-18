@@ -1,4 +1,5 @@
-// The two charts: the radar and the score trend for one scenario.
+// The charts: the radar, the score trend for one scenario, kills over the
+// course of one run, and precision against score.
 // Chart.js is loaded from vendor/ (a local copy, no internet needed).
 
 const charts = {}; // the chart currently drawn on each canvas, so we can replace it
@@ -157,5 +158,54 @@ function drawTrend(canvasId, runs, summary) {
       },
     },
     plugins: [thresholdLabels],
+  });
+}
+
+// Kills per sixth of the run: does the pace hold?
+function drawKillCurve(canvasId, details) {
+  const slice = details.duration / details.curve.length;
+  replaceChart(canvasId, {
+    type: 'bar',
+    data: {
+      labels: details.curve.map((_, i) => `${num(i * slice)}-${num((i + 1) * slice)} s`),
+      datasets: [{ label: 'Kills', data: details.curve, backgroundColor: cssColor('--series-1'), borderRadius: 4 }],
+    },
+    options: {
+      ...baseOptions(),
+      scales: {
+        x: { grid: { display: false }, ticks: { color: cssColor('--muted'), font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: cssColor('--grid') }, ticks: { color: cssColor('--muted'), precision: 0 } },
+      },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+// One dot per run: accuracy along the bottom, score up the side. The newest
+// five runs are drawn in the second color, so you can see where you are now.
+function drawScatter(canvasId, runs) {
+  const withAcc = runs.filter((r) => r.accuracy !== null);
+  const recent = withAcc.slice(-5);
+  const older = withAcc.slice(0, -5);
+  const point = (r) => ({ x: r.accuracy * 100, y: r.score, run: r });
+  replaceChart(canvasId, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label: 'Ældre runs', data: older.map(point), backgroundColor: cssColor('--series-1'), pointRadius: 4 },
+        { label: 'Seneste 5', data: recent.map(point), backgroundColor: cssColor('--series-2'), pointRadius: 5 },
+      ],
+    },
+    options: {
+      ...baseOptions(),
+      scales: {
+        x: { title: { display: true, text: 'Accuracy (%)', color: cssColor('--muted') }, grid: { color: cssColor('--grid') }, ticks: { color: cssColor('--muted') } },
+        y: { title: { display: true, text: 'Score', color: cssColor('--muted') }, grid: { color: cssColor('--grid') }, ticks: { color: cssColor('--muted') } },
+      },
+      plugins: {
+        legend: { labels: { color: cssColor('--text-2'), boxWidth: 10 } },
+        tooltip: { callbacks: { label: (item) => `${num(item.raw.y, 1)} · ${num(item.raw.x, 1)} % · ${dateTime(item.raw.run.playedAt)}` } },
+      },
+    },
   });
 }

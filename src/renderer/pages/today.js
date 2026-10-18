@@ -141,6 +141,7 @@ function proposalCard(data) {
       <p class="big-summary">${esc(program.name)}</p>
       <p class="secondary">${esc(program.summary)}</p>
       ${stale}
+      ${p.lastReport ? `<details><summary>Sådan gik dit sidste program (${esc(p.lastReport.programName)})</summary>${reportBlock(p.lastReport, 'Fra start til slut')}</details>` : ''}
       ${p.rationale ? `<div class="alert good">${icon('chat')}<div>${esc(p.rationale)}</div></div>` : ''}
       <details>
         <summary>Se ugeplanen</summary>
@@ -150,7 +151,7 @@ function proposalCard(data) {
             <span class="pill">${(pass.parts[0].scenarios || []).reduce((n, s) => n + s.playCount, 0)} runs</span>
           </li>`).join('')}
         </ul>
-        <p class="muted small">Uge 2 og 3 er de samme dage, og sidste dag er en ny benchmark-test, så du kan se forskellen.</p>
+        <p class="muted small">Uge 2 og 3 er de samme dage. Lørdag er testdag med de samme scenarier hver uge, og allersidste dag er en ny benchmark-test.</p>
       </details>
       <div class="proposal-actions">
         <button class="btn" id="accept-proposal">${icon('check', 16)}Ja tak, brug det</button>
@@ -159,6 +160,110 @@ function proposalCard(data) {
           ? `<button class="btn ghost" id="explain-proposal">${icon('chat', 15)}Hvorfor det her?</button>` : ''}
       </div>
     </div>`;
+}
+
+// New PBs and rank-ups from today, until you close the card. Which ones you
+// have seen is kept in the page's own storage (nothing leaves the computer).
+const SEEN_KEY = 'recordsSeenUntil';
+function recordsCard(data) {
+  const seen = localStorage.getItem(SEEN_KEY) || '';
+  const events = (data.records || []).filter((r) => r.playedAt.slice(0, 10) === data.today.date && r.playedAt > seen);
+  if (!events.length) return '';
+  // One line per scenario: from the best before today's first PB to the newest.
+  // Records are newest first, so the first one seen per scenario is the newest.
+  const byScenario = new Map();
+  for (const r of events) {
+    const key = normalizeName(r.scenario);
+    const entry = byScenario.get(key);
+    if (!entry) byScenario.set(key, { ...r });
+    else {
+      entry.previous = r.previous;
+      entry.rank = entry.rank || r.rank;
+    }
+  }
+  const fresh = [...byScenario.values()].map((r) => ({ ...r, gain: (r.score - r.previous) / r.previous }));
+  const rankUps = fresh.filter((r) => r.rank);
+  const title = rankUps.length
+    ? `Rank-up! ${rankUps.slice(0, 2).map((r) => `${esc(shortName(r.scenario))} ${rankBadge(r.rank)}`).join(' ')}`
+    : `${fresh.length} ny${fresh.length > 1 ? 'e' : ''} rekord${fresh.length > 1 ? 'er' : ''} i dag!`;
+  return `
+    <div class="card celebrate${rankUps.length ? ' big' : ''}">
+      <div class="confetti" aria-hidden="true">${'<i></i>'.repeat(14)}</div>
+      <div class="card-head"><h2>${icon('bolt', 16)} ${title}</h2>
+        <button class="btn ghost small" id="records-seen" data-until="${esc(fresh[0].playedAt)}">Fedt, luk</button></div>
+      <ul class="closest">${fresh.slice(0, 6).map((r) => `<li>
+        <div class="nm"><b>${esc(shortName(r.scenario))}</b><small>${num(r.previous, 1)} → ${num(r.score, 1)}</small></div>
+        ${r.rank ? rankBadge(r.rank) : ''}
+        <span class="pill good">+${num(r.gain * 100, 1)} %</span>
+      </li>`).join('')}</ul>
+    </div>`;
+}
+
+// The last seven days compared with the seven before.
+function weekCard(data) {
+  const w = data.week;
+  if (!w || (!w.runs && !w.runsLastWeek)) return '';
+  const diff = w.runs - w.runsLastWeek;
+  const change = (c) => `<li><div class="nm"><b>${esc(shortName(c.scenario))}</b><small>median ${num(c.before, 1)} → ${num(c.after, 1)}</small></div>
+    <span class="pill ${c.change > 0 ? 'good' : 'warning'}">${c.change > 0 ? '+' : ''}${num(c.change * 100, 1)} %</span></li>`;
+  const lists = w.improved.length || w.dropped.length
+    ? `<ul class="closest">${w.improved.map(change).join('')}${w.dropped.map(change).join('')}</ul>`
+    : '<p class="muted small">Spil de samme scenarier to uger i træk, så kan appen vise, hvad der går frem.</p>';
+  return `
+    <div class="card">
+      <div class="card-head"><h2>Din uge</h2><span class="secondary small">sidste 7 dage</span></div>
+      <div class="kpis">
+        <div class="kpi"><span>Runs</span><b>${w.runs}</b><small class="${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : ''}${diff} mod ugen før</small></div>
+        <div class="kpi"><span>Dage trænet</span><b>${w.days}</b></div>
+        <div class="kpi"><span>Nye rekorder</span><b>${w.newBests}</b></div>
+        <div class="kpi"><span>Rank-ups</span><b>${w.rankUps}</b></div>
+      </div>
+      ${lists}
+    </div>`;
+}
+
+// How the programme is going (or went): the subcategories you trained and the
+// weekly test medians, compared with before you started.
+function reportBlock(report, heading) {
+  if (!report) return '';
+  const pp = (v) => `${v >= 0 ? '+' : ''}${num(v * 100, 1)} point`;
+  const subs = report.subcategories.filter((s) => s.focus || Math.abs(s.change) >= 0.02);
+  const tests = report.tests.filter((t) => t.weeks.some((v) => v !== null));
+  return `
+    <h3>${heading}</h3>
+    <ul class="closest">${subs.map((s) => `<li>
+      <div class="nm"><b>${esc(s.subcategory)}${s.focus ? ' <span class="pill">fokus</span>' : ''}</b>
+        <small>${pct(s.before)} → ${pct(s.now)} af Platinum</small></div>
+      <span class="pill ${s.change > 0.005 ? 'good' : s.change < -0.005 ? 'warning' : ''}">${pp(s.change)}</span>
+    </li>`).join('')}</ul>
+    ${tests.length ? `<table class="small">
+      <tr><th>Testdag (median)</th><th class="num">Før</th>${tests[0].weeks.map((_, i) => `<th class="num">Uge ${i + 1}</th>`).join('')}</tr>
+      ${tests.map((t) => `<tr><td>${esc(shortName(t.scenario))}</td><td class="num">${num(t.before, 0)}</td>${t.weeks.map((v) => `<td class="num">${num(v, 0)}</td>`).join('')}</tr>`).join('')}
+    </table>` : '<p class="muted small">Testdagen om lørdagen fylder en tabel ud her, uge for uge.</p>'}`;
+}
+
+function programReportCard(data) {
+  const p = data.proposal;
+  if (!p || p.status !== 'active' || !p.report) return '';
+  return `<div class="card">
+    <div class="card-head"><h2>${icon('chat', 16)} Sådan går programmet</h2><span class="pill">uge ${p.report.week} af ${data.activeProgram.weeks}</span></div>
+    ${reportBlock(p.report, 'Siden du startede')}
+  </div>`;
+}
+
+// "61 cm (0,85)": the sens that has worked best for you on this kind of scenario.
+const SENS_BASIS = {
+  scenario: 'dine egne runs på netop dette scenarie',
+  similar: 'dine runs på lignende scenarier (samme underkategori)',
+  usual: 'den sens, du plejer at spille på',
+  rule: 'Viscose-reglen: Fingertip skal spilles på 50 cm/360 eller hurtigere',
+};
+function sensTipPill(tip) {
+  if (!tip) return '';
+  const better = tip.gain ? `, ca. ${num(tip.gain * 100)} % bedre end din normale` : '';
+  const title = `Sens-forslag ud fra ${SENS_BASIS[tip.basis]}${better}.`;
+  const cls = tip.basis === 'usual' ? '' : ' accent';
+  return `<span class="pill sens${cls}" title="${esc(title)}">${num(tip.cm, 1)} cm${tip.sens !== null && tip.sens !== undefined ? ` (${num(tip.sens, 2)})` : ''}</span>`;
 }
 
 // One part of the session: a playlist (with buttons) or a list of scenarios.
@@ -188,6 +293,7 @@ function partBlock(part, playlistStatus) {
       <li class="${state}">
         <span class="tick">${state === 'done' ? icon('check', 14) : ''}</span>
         <span class="sc" title="Åbn i KovaaK's" data-open-scenario="${esc(item.name)}">${esc(item.name)}</span>
+        ${sensTipPill(item.sensTip)}
         ${item.isNew ? '<span class="pill warning" title="Du har aldrig spillet den. KovaaK\'s skal hente den første gang.">ny</span>' : ''}
         <span class="cnt">${item.done}/${item.need}${item.extra ? ` <small>+${item.extra}</small>` : ''}</span>
       </li>`;
@@ -345,9 +451,12 @@ function renderToday(data) {
     <div class="stack">
       ${weekHero(data)}
       ${rest}
+      ${recordsCard(data)}
       ${proposalCard(data)}
       ${statusTiles(data)}
       ${todaysSession(data)}
+      ${programReportCard(data)}
+      ${weekCard(data)}
       <div class="cols cols-2">
         <div class="card"><h2>Tættest på næste rank</h2>${closestToRank(data)}</div>
         ${sessionForm()}
@@ -393,6 +502,11 @@ function renderToday(data) {
   const clearProgram = document.getElementById('clear-program');
   if (clearProgram) clearProgram.addEventListener('click', () => {
     if (confirm('Stop dette program og gå tilbage til den indbyggede 12-ugers plan?')) window.api.clearProgram();
+  });
+  const recordsSeen = document.getElementById('records-seen');
+  if (recordsSeen) recordsSeen.addEventListener('click', () => {
+    localStorage.setItem(SEEN_KEY, recordsSeen.dataset.until);
+    renderToday(data);
   });
   const undismiss = document.getElementById('undismiss');
   if (undismiss) undismiss.addEventListener('click', () => window.api.undismissProposal());

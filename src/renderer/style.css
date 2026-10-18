@@ -82,7 +82,7 @@ h3 { font-size: 12px; margin: 0 0 10px; font-weight: 600; color: var(--text-2); 
 .cols-2 { grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr); align-items: start; }
 .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cols-split { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; }
-.sticky { position: sticky; top: 0; }
+.sticky { position: sticky; top: 0; max-height: calc(100vh - 80px); overflow-y: auto; }
 @media (max-width: 1150px) { .cols-2, .cols-split { grid-template-columns: 1fr; } .sticky { position: static; } }
 
 /* ---------- Buttons ---------- */
@@ -288,7 +288,7 @@ button.citation:hover { border-color: var(--accent); color: var(--text); }
 
 /* ---------- Today's session (I dag) ---------- */
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
-.card-head h2 { margin: 0; }
+.card-head h2 { margin: 0; display: flex; align-items: center; gap: 8px; }
 .steps { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
 .step { flex: 1; min-width: 92px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
 .step b { display: block; font-size: 15px; }
@@ -346,3 +346,53 @@ th { white-space: nowrap; }
 .code-card .name { font-weight: 600; color: var(--text); }
 .blocks.one { grid-template-columns: 1fr auto; align-items: center; }
 .checklist li .pill { font-size: 10px; padding: 0 6px; }
+
+/* Sens tip, trend and in-run analysis */
+.checklist li .pill.sens.accent { color: var(--accent); border-color: var(--accent-soft); }
+.pill-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.kpi small { display: block; font-size: 11px; color: var(--muted); }
+.kpi small.up { color: var(--good); }
+.kpi small.down { color: var(--warning); }
+.chart-box.short { height: 150px; margin-top: 10px; }
+.notes { margin: 10px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; }
+.notes li + li { margin-top: 4px; }
+table.small td, table.small th { padding: 6px 8px; font-size: 12px; }
+
+/* Records: a little confetti when you beat a PB or rank up */
+.celebrate { position: relative; overflow: hidden; border-color: rgba(12, 163, 12, 0.45);
+  background: linear-gradient(135deg, rgba(12, 163, 12, 0.12), rgba(76, 90, 255, 0.10)); }
+.celebrate.big { border-color: rgba(238, 134, 222, 0.5); }
+.celebrate .card-head h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.confetti { position: absolute; inset: 0; pointer-events: none; }
+.confetti i { position: absolute; top: -12px; width: 7px; height: 12px; border-radius: 2px; opacity: 0;
+  animation: confetti-fall 2.6s ease-in 1 forwards; }
+.confetti i:nth-child(4n+1) { background: #4fd3da; }
+.confetti i:nth-child(4n+2) { background: #ee86de; }
+.confetti i:nth-child(4n+3) { background: #f0c552; }
+.confetti i:nth-child(4n) { background: #4ee0a0; }
+.confetti i:nth-child(1) { left: 4%; animation-delay: 0s; }
+.confetti i:nth-child(2) { left: 11%; animation-delay: .3s; }
+.confetti i:nth-child(3) { left: 18%; animation-delay: .1s; }
+.confetti i:nth-child(4) { left: 26%; animation-delay: .5s; }
+.confetti i:nth-child(5) { left: 33%; animation-delay: .2s; }
+.confetti i:nth-child(6) { left: 41%; animation-delay: .6s; }
+.confetti i:nth-child(7) { left: 49%; animation-delay: .05s; }
+.confetti i:nth-child(8) { left: 56%; animation-delay: .4s; }
+.confetti i:nth-child(9) { left: 63%; animation-delay: .15s; }
+.confetti i:nth-child(10) { left: 71%; animation-delay: .55s; }
+.confetti i:nth-child(11) { left: 78%; animation-delay: .25s; }
+.confetti i:nth-child(12) { left: 85%; animation-delay: .45s; }
+.confetti i:nth-child(13) { left: 91%; animation-delay: .1s; }
+.confetti i:nth-child(14) { left: 96%; animation-delay: .35s; }
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(220px) rotate(540deg); }
+}
+@media (prefers-reduced-motion: reduce) { .confetti { display: none; } }
+
+/* Katalog */
+.catalog-search { display: flex; gap: 8px; align-items: center; }
+.catalog-search input { flex: 1; min-width: 0; }
+.catalog-item .pl-head { margin-bottom: 0; }
+.catalog-item details { margin-top: 10px; }
+.catalog-item p { margin: 8px 0 0; }

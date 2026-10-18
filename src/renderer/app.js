@@ -7,6 +7,7 @@ let latestData = null;
 const RENDERERS = {
   today: renderToday,
   scenarios: renderScenarios,
+  catalog: renderCatalog,
   radar: renderRadar,
   sessions: renderSessions,
   log: renderLog,
