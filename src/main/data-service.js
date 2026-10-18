@@ -80,18 +80,47 @@ function withSteps(session) {
   return { ...session, steps, totalMinutes: steps.reduce((sum, step) => sum + step.minutes, 0) };
 }
 
+// Which benchmark playlist a scenario belongs to. Opening that playlist once
+// makes KovaaK's fetch every scenario in it.
+function playlistForScenario(name) {
+  if (/ Novice S5$/.test(name)) return { name: 'Voltaic S5.5 Novice', code: thresholds.share_codes.Novice };
+  if (/ Intermediate S5$/.test(name)) return { name: 'Voltaic S5.5 Intermediate', code: thresholds.share_codes.Intermediate };
+  const benchmark = viscose.benchmarks.find((b) => b.scenarios.some((s) => normalizeName(s.name) === normalizeName(name)));
+  return benchmark ? { name: benchmark.name, code: benchmark.share_code } : null;
+}
+
+// Marks scenarios you have never played. The first time KovaaK's sees a
+// scenario it has to fetch it, and opening the playlist it belongs to gets
+// them all at once, which is more reliable than one deep link at a time.
+function markNewScenarios(session, runs) {
+  if (!session.progress) return session;
+  const everPlayed = new Set(runs.map((run) => normalizeName(run.scenario)));
+  const newPlaylists = new Map();
+
+  for (const part of session.progress.parts) {
+    if (!part.progress) continue;
+    for (const item of part.progress.items) {
+      item.isNew = !everPlayed.has(normalizeName(item.name));
+      if (!item.isNew) continue;
+      const playlist = playlistForScenario(item.name);
+      if (playlist) newPlaylists.set(playlist.code, playlist);
+    }
+  }
+  return { ...session, newScenarioPlaylists: [...newPlaylists.values()] };
+}
+
 // Calendar mode: today's weekday in the plan, counting today's runs.
 function calendarSession(today, runs, playlists) {
   const pseudoPass = { deload: false, parts: today.codes.map((c) => ({ kind: 'playlist', code: c.code, title: c.name })) };
   const runsToday = runs.filter((run) => run.playedAt.startsWith(today.date));
   const progress = today.codes.length ? program.passProgress(pseudoPass, runsToday, playlists, 1) : null;
-  return withSteps({
+  return markNewScenarios(withSteps({
     mode: 'calendar',
     status: today.codes.length ? 'active' : 'none',
     title: today.schedule,
     position: today.weekInfo,
     progress,
-  });
+  }), runs);
 }
 
 // Follow mode: the pass the pointer is on. Moves the pointer on (and saves it)
@@ -109,7 +138,7 @@ function followSession(database, today, runs, playlists, logs) {
   const lastLogDay = logs[0] ? plan.isoDay(new Date(logs[0].created_at)) : null;
   const painLock = view.status === 'active' && stats.needsRestWarning(logs) && lastLogDay === today;
 
-  return withSteps({
+  return markNewScenarios(withSteps({
     mode: 'follow',
     status: painLock ? 'pain' : view.status,
     title: pass ? `${program.passTitle(pass)}: ${pass.label}` : 'Programmet er gennemført',
@@ -122,7 +151,7 @@ function followSession(database, today, runs, playlists, logs) {
     index: view.index,
     total: view.total,
     done: view.done,
-  });
+  }), runs);
 }
 
 // What the home screen shows about programmes: either "play these benchmarks

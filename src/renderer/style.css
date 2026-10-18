@@ -345,3 +345,4 @@ th { white-space: nowrap; }
 .proposal-slim { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .code-card .name { font-weight: 600; color: var(--text); }
 .blocks.one { grid-template-columns: 1fr auto; align-items: center; }
+.checklist li .pill { font-size: 10px; padding: 0 6px; }

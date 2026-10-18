@@ -188,6 +188,7 @@ function partBlock(part, playlistStatus) {
       <li class="${state}">
         <span class="tick">${state === 'done' ? icon('check', 14) : ''}</span>
         <span class="sc" title="Åbn i KovaaK's" data-open-scenario="${esc(item.name)}">${esc(item.name)}</span>
+        ${item.isNew ? '<span class="pill warning" title="Du har aldrig spillet den. KovaaK\'s skal hente den første gang.">ny</span>' : ''}
         <span class="cnt">${item.done}/${item.need}${item.extra ? ` <small>+${item.extra}</small>` : ''}</span>
       </li>`;
   }).join('');
@@ -233,6 +234,19 @@ function todaysSession(data) {
       </div>`
     : '';
 
+  // The first time KovaaK's meets a scenario it has to fetch it, and a single
+  // deep link can land you in the scenario without a running challenge.
+  // Opening the playlist it belongs to gets them all in one go.
+  const newScenarios = (s.newScenarioPlaylists || []);
+  const newHint = newScenarios.length
+    ? `<div class="alert warning">${icon('alert')}<div>
+        <b>Nogle scenarier er nye for dig.</b> Åbn playlisten herunder én gang, så henter KovaaK's dem alle.
+        Starter et nyt scenarie uden timer, er det fordi spillet ikke har det endnu.
+        <div class="pl-buttons">${newScenarios.map((p) => `
+          <button class="btn small" data-open-playlist="${esc(p.code)}">${icon('bolt', 15)}Hent ${esc(p.name)}</button>`).join('')}</div>
+      </div></div>`
+    : '';
+
   const welcomeBack = s.daysWaiting >= 3
     ? `<div class="alert warning">${icon('alert')}<div><b>Velkommen tilbage!</b> Passet har ventet i ${s.daysWaiting} dage. Tag below-level-delen lidt længere i dag, og jag ikke PB'er.</div></div>`
     : '';
@@ -253,6 +267,7 @@ function todaysSession(data) {
         ${s.totalMinutes ? `<span class="pill">${icon('clock')}ca. ${s.totalMinutes} min i alt</span>` : ''}
       </div>
       ${s.passText ? `<p class="secondary small">${esc(s.passText)}</p>` : ''}
+      ${newHint}
       ${welcomeBack}
       ${steps}
       ${s.progress.parts.map((part) => partBlock(part, data.playlistStatus)).join('')}
