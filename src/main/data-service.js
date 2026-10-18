@@ -7,6 +7,7 @@ const stats = require('../core/stats');
 const plan = require('../core/plan');
 const program = require('../core/program');
 const follow = require('../core/follow');
+const coachPlan = require('../core/coach-plan');
 const { cmPer360 } = require('../core/sens');
 
 const appRoot = path.join(__dirname, '..', '..');
@@ -17,14 +18,24 @@ const thresholds = readJson('data', 'voltaic_s5_5_thresholds.json');
 const viscose = readJson('data', 'viscose_thresholds.json');
 const targets = readJson('data', 'targets.json').targets;
 const programData = readJson('data', 'program.json');
-const passes = program.buildPasses(programData);
+const builtInPasses = program.buildPasses(programData);
 const shareCodes = plan.readShareCodes(fs.readFileSync(path.join(appRoot, 'docs', 'training-program.md'), 'utf8'));
 
-// Every share code the plan and the program use. main.js caches these from kovaaks.com.
+// The passes you are actually following: a programme the coach made and you
+// accepted (stored in the database), or the built-in 12-week plan.
+function activeProgram(database) {
+  return db.getState(database, 'program');
+}
+function currentPasses(database) {
+  const generated = activeProgram(database);
+  return generated && generated.passes.length ? generated.passes : builtInPasses;
+}
+
+// Every share code the plan and the programmes use. main.js caches these from kovaaks.com.
 const allPlanCodes = [...new Set([
   ...Object.values(shareCodes.adept),
   ...Object.values(shareCodes.benchmarks),
-  ...passes.flatMap((pass) => pass.parts.filter((p) => p.kind === 'playlist').map((p) => p.code)),
+  ...builtInPasses.flatMap((pass) => pass.parts.filter((p) => p.kind === 'playlist').map((p) => p.code)),
   ...viscose.benchmarks.map((b) => b.share_code),
 ])];
 
@@ -86,6 +97,7 @@ function calendarSession(today, runs, playlists) {
 // Follow mode: the pass the pointer is on. Moves the pointer on (and saves it)
 // when the current pass is finished.
 function followSession(database, today, runs, playlists, logs) {
+  const passes = currentPasses(database);
   let state = db.getState(database, 'follow') || follow.startState(0, today);
   const result = follow.advance(state, passes, runs, playlists, programData.deload_volume, today);
   if (result.changed || !db.getState(database, 'follow')) db.setState(database, 'follow', result.state);
@@ -113,6 +125,46 @@ function followSession(database, today, runs, playlists, logs) {
   });
 }
 
+// What the home screen shows about programmes: either "play these benchmarks
+// first", a suggestion you can say yes or no to, or nothing while you are
+// already following one. The suggestion itself is built in code, so it works
+// with or without Ollama (see src/core/coach-plan.js).
+function buildProposal(database, summaries, todayIso) {
+  const active = activeProgram(database);
+  if (active) {
+    const state = db.getState(database, 'follow');
+    const finished = state && state.index >= active.passes.length;
+    if (!finished) return { status: 'active', name: active.name, kind: active.kind };
+  }
+
+  const readiness = coachPlan.benchmarkReadiness(summaries, todayIso);
+  if (!readiness.ready) {
+    return {
+      status: 'needs-benchmarks',
+      missing: readiness.missing,
+      done: readiness.total - readiness.missing.length,
+      total: readiness.total,
+      playlistCode: thresholds.share_codes.Intermediate,
+    };
+  }
+
+  const dismissed = db.getState(database, 'proposalDismissed');
+  const kind = (dismissed && dismissed.nextKind) || 'weakness';
+  const suggestion = coachPlan.generateProgram(kind, summaries, thresholds.share_codes.Intermediate);
+  if (!suggestion) return { status: 'none' };
+  if (dismissed && dismissed.until > todayIso && dismissed.kind === suggestion.kind) {
+    return { status: 'dismissed', until: dismissed.until };
+  }
+
+  const rationale = db.getState(database, 'proposalRationale');
+  return {
+    status: 'ready',
+    program: suggestion,
+    stale: readiness.stale,
+    rationale: rationale && rationale.id === suggestion.id ? rationale.text : null,
+  };
+}
+
 function buildData(database, extra, options = {}) {
   const runs = runsWithSens(db.allRuns(database));
   const summaries = stats.scenarioSummaries(runs, thresholds, targets);
@@ -127,12 +179,15 @@ function buildData(database, extra, options = {}) {
       ? followSession(database, today.date, runs, playlists, logs)
       : calendarSession(today, runs, playlists),
     // For the "Start fra" list on the settings page.
-    passes: passes.map((pass, index) => ({ index, title: `${program.passTitle(pass)}: ${pass.label}` })),
+    passes: currentPasses(database).map((pass, index) => ({ index, title: `${program.passTitle(pass)}: ${pass.label}` })),
+    activeProgram: activeProgram(database),
     latestRun: runs[runs.length - 1] || null,
     scenarios: summaries,
     radar: stats.radarData(summaries),
+    proposal: buildProposal(database, summaries, today.date),
+    voltaicShareCodes: thresholds.share_codes,
     viscose: viscose.benchmarks.map((benchmark) => {
-      return { id: benchmark.id, name: benchmark.name, ranks: benchmark.ranks, referenceRank: benchmark.reference_rank, scenarios: stats.benchmarkSummaries(runs, benchmark) };
+      return { id: benchmark.id, name: benchmark.name, ranks: benchmark.ranks, referenceRank: benchmark.reference_rank, shareCode: benchmark.share_code, scenarios: stats.benchmarkSummaries(runs, benchmark) };
     }),
     sessions: stats.groupSessions(runs, config.session_gap_minutes),
     runs: [...runs].reverse(), // newest first for the log
@@ -159,7 +214,36 @@ function setFollowStart(database, index) {
 }
 function markFollowDone(database) {
   const state = db.getState(database, 'follow');
-  if (state) db.setState(database, 'follow', follow.markDone(state, passes, plan.isoDay(new Date())));
+  if (state) db.setState(database, 'follow', follow.markDone(state, currentPasses(database), plan.isoDay(new Date())));
 }
 
-module.exports = { buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone };
+// Saying yes to a suggestion: it becomes the programme you follow, starting
+// at its first pass today.
+function acceptProposal(database, program) {
+  db.setState(database, 'program', program);
+  db.setState(database, 'follow', follow.startState(0, plan.isoDay(new Date())));
+  db.setState(database, 'proposalDismissed', null);
+}
+
+// Saying no: don't suggest the same kind again for a week, and offer the
+// other kind next time instead.
+function rejectProposal(database, kind) {
+  const until = follow.addDays(plan.isoDay(new Date()), 7);
+  db.setState(database, 'proposalDismissed', { kind, until, nextKind: kind === 'weakness' ? 'general' : 'weakness' });
+}
+
+// "Foreslå alligevel": forget that you said no.
+function undismissProposal(database) {
+  db.setState(database, 'proposalDismissed', null);
+}
+
+// Back to the built-in 12-week plan.
+function clearProgram(database) {
+  db.setState(database, 'program', null);
+  db.setState(database, 'follow', follow.startState(0, plan.isoDay(new Date())));
+}
+
+module.exports = {
+  buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone,
+  acceptProposal, rejectProposal, undismissProposal, clearProgram,
+};

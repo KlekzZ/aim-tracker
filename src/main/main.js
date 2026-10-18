@@ -5,7 +5,10 @@ const path = require('node:path');
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const db = require('../core/db');
 const { importFolder } = require('../core/importer');
-const { buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone } = require('./data-service');
+const {
+  buildData, config, planCodesTodayFirst, setFollowStart, markFollowDone,
+  acceptProposal, rejectProposal, undismissProposal, clearProgram,
+} = require('./data-service');
 const kovaaks = require('./kovaaks');
 const { loadSettings, saveSettings } = require('./app-settings');
 const updater = require('./updater');
@@ -233,6 +236,59 @@ function registerIpc() {
     notifyPage('data-changed');
   });
   ipcMain.handle('open-in-kovaaks', (_event, target) => kovaaks.openInKovaaks(target || {}));
+
+  // ---------- Programme suggestions on the home screen ----------
+
+  ipcMain.handle('accept-proposal', () => {
+    // Rebuild the suggestion here instead of trusting what the page sends,
+    // so the programme that gets saved is always one this code generated.
+    const proposal = buildData(database, {}, { followPlan: settings.followPlan }).proposal;
+    if (proposal.status !== 'ready') return false;
+    acceptProposal(database, proposal.program);
+    settings.followPlan = true; // a programme is only useful if you follow it
+    saveSettings(settings);
+    notifyPage('data-changed');
+    return true;
+  });
+
+  ipcMain.handle('reject-proposal', (_event, kind) => {
+    rejectProposal(database, kind === 'general' ? 'general' : 'weakness');
+    notifyPage('data-changed');
+  });
+
+  ipcMain.handle('undismiss-proposal', () => {
+    undismissProposal(database);
+    notifyPage('data-changed');
+  });
+
+  ipcMain.handle('clear-program', () => {
+    clearProgram(database);
+    notifyPage('data-changed');
+  });
+
+  // Asks the local model why this programme makes sense, using your sources.
+  ipcMain.handle('explain-proposal', async () => {
+    const data = buildData(database, {}, { followPlan: settings.followPlan });
+    if (data.proposal.status !== 'ready') return;
+    const p = data.proposal.program;
+    const weak = p.profile.map((row) => `${row.subcategory} (${Math.round(row.percent * 100)} % af Platinum)`).join(', ');
+    const question = `Jeg har fået foreslået dette træningsprogram: "${p.name}". `
+      + `Mine svageste underkategorier er: ${weak}. `
+      + 'Forklar kort (højst 4 sætninger), hvorfor det giver mening at træne netop det, og hvad jeg skal holde øje med undervejs.';
+
+    db.setState(database, 'proposalRationale', { id: p.id, text: 'Spørger Coach...' });
+    notifyPage('data-changed');
+    try {
+      const { answer } = await coach.ask(database, question, {
+        embedModel: settings.coachEmbedModel, chatModel: settings.coachChatModel,
+        includeStats: true, data, onToken: () => {},
+      });
+      db.setState(database, 'proposalRationale', { id: p.id, text: answer });
+    } catch (err) {
+      db.setState(database, 'proposalRationale', { id: p.id, text: `Kunne ikke spørge Coach: ${err.message}` });
+    }
+    notifyPage('data-changed');
+  });
   ipcMain.handle('install-update', () => updater.installNow());
 
   // ---------- AI coach: local knowledge base and chat (Ollama, 127.0.0.1 only) ----------

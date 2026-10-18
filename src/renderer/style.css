@@ -335,3 +335,13 @@ button.citation:hover { border-color: var(--accent); color: var(--text); }
 th { white-space: nowrap; }
 .subbar.wide { grid-template-columns: 170px 1fr 70px; }
 .subbar small.block { display: block; }
+
+/* Programme suggestion on the home screen */
+.proposal .card-head h2 { display: flex; align-items: center; gap: 8px; }
+.proposal .big-summary { font-size: 18px; font-weight: 700; margin: 2px 0 4px; }
+.proposal .alert { margin: 12px 0; }
+.proposal details { margin-top: 12px; }
+.proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.proposal-slim { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.code-card .name { font-weight: 600; color: var(--text); }
+.blocks.one { grid-template-columns: 1fr auto; align-items: center; }

@@ -8,9 +8,9 @@ let selectedScenario = null;
 // The benchmarks shown in the switch at the top.
 function benchmarkSets(data) {
   return [
-    { key: 'voltaic:Intermediate', label: 'Voltaic Intermediate', scenarios: data.scenarios.filter((s) => s.tier === 'Intermediate'), voltaic: true },
-    { key: 'voltaic:Novice', label: 'Voltaic Novice', scenarios: data.scenarios.filter((s) => s.tier === 'Novice'), voltaic: true },
-    ...data.viscose.map((b) => ({ key: `viscose:${b.id}`, label: b.name, scenarios: b.scenarios, voltaic: false })),
+    { key: 'voltaic:Intermediate', label: 'Voltaic Intermediate', scenarios: data.scenarios.filter((s) => s.tier === 'Intermediate'), voltaic: true, code: data.voltaicShareCodes.Intermediate },
+    { key: 'voltaic:Novice', label: 'Voltaic Novice', scenarios: data.scenarios.filter((s) => s.tier === 'Novice'), voltaic: true, code: data.voltaicShareCodes.Novice },
+    ...data.viscose.map((b) => ({ key: `viscose:${b.id}`, label: b.name, scenarios: b.scenarios, voltaic: false, code: b.shareCode })),
   ];
 }
 
@@ -130,6 +130,11 @@ function renderScenarios(data) {
     ${pageHead('Scenarier', subtitle, `<div class="set-switch">${setSwitch}</div>`)}
     <div class="cols cols-split">
       <div class="stack">
+        ${set.code ? `<div class="code-card">
+          <div><div class="name">Hele playlisten: ${esc(set.label)}</div><code>${esc(set.code)}</code></div>
+          <button class="btn small" data-open-playlist="${esc(set.code)}">${icon('bolt', 15)}Spil i KovaaK's</button>
+          <button class="btn ghost small" data-copy="${esc(set.code)}">${icon('copy', 15)}<span>Kopiér</span></button>
+        </div>` : ''}
         <div class="card table-wrap">
           <table>
             <tr><th>Scenarie</th><th>Rank</th><th class="num">Bedst</th><th class="num">Median 3</th><th>Mod næste rank</th>${columns === 6 ? `<th class="num">${target.label}</th>` : ''}</tr>
@@ -157,6 +162,14 @@ function renderScenarios(data) {
   }));
   page.querySelectorAll('[data-open-scenario]').forEach((el) => el.addEventListener('click', () =>
     window.api.openInKovaaks({ type: 'scenario', name: el.dataset.openScenario })));
+  page.querySelectorAll('[data-open-playlist]').forEach((el) => el.addEventListener('click', () =>
+    window.api.openInKovaaks({ type: 'playlist', code: el.dataset.openPlaylist })));
+  page.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(button.dataset.copy);
+    const label = button.querySelector('span');
+    label.textContent = 'Kopieret';
+    setTimeout(() => { label.textContent = 'Kopiér'; }, 1500);
+  }));
 
   if (runs.length) drawTrend('trend-chart', runs, selected);
 }

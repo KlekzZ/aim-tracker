@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('api', {
   setFollowPlan: (enabled) => ipcRenderer.invoke('set-follow-plan', enabled),
   followStart: (index) => ipcRenderer.invoke('follow-start', index),
   followMarkDone: () => ipcRenderer.invoke('follow-mark-done'),
+  acceptProposal: () => ipcRenderer.invoke('accept-proposal'),
+  rejectProposal: (kind) => ipcRenderer.invoke('reject-proposal', kind),
+  undismissProposal: () => ipcRenderer.invoke('undismiss-proposal'),
+  clearProgram: () => ipcRenderer.invoke('clear-program'),
+  explainProposal: () => ipcRenderer.invoke('explain-proposal'),
   // target: { type: 'playlist', code } or { type: 'scenario', name }
   openInKovaaks: (target) => ipcRenderer.invoke('open-in-kovaaks', target),
   onDataChanged: (callback) => ipcRenderer.on('data-changed', () => callback()),

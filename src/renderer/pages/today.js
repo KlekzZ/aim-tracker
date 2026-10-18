@@ -11,21 +11,32 @@ function weekHero(data) {
   const s = data.session;
   // In follow mode the week comes from the pass you are on, not the calendar.
   const w = s.position || { week: null };
+  // A programme the coach made has its own length and no fixed blocks, so the
+  // week counter and the timeline follow whichever programme is active.
+  const generated = data.activeProgram;
+  const totalWeeks = generated ? generated.weeks : data.totalWeeks;
+  const deloadWeeks = generated ? [] : data.deloadWeeks;
+
   let title;
   if (s.mode === 'follow' && s.status === 'finished') title = 'Programmet er gennemført';
   else if (w.week === null) title = 'Før planen';
   else if (w.week === 0) title = 'Uge 0 <small>opstart og baseline</small>';
-  else if (w.week > data.totalWeeks) title = 'Planen er færdig';
-  else title = `Uge ${w.week} <small>af ${data.totalWeeks} · blok ${w.block}${w.deload ? ' · deload, 50 % volumen' : ''}</small>`;
+  else if (w.week > totalWeeks) title = 'Planen er færdig';
+  else title = `Uge ${w.week} <small>af ${totalWeeks}${generated ? '' : ` · blok ${w.block}`}${w.deload ? ' · deload, 50 % volumen' : ''}</small>`;
 
   const segments = [];
-  for (let week = 1; week <= data.totalWeeks; week++) {
+  for (let week = 1; week <= totalWeeks; week++) {
     const classes = ['wk'];
     if (w.week > week) classes.push('done');
     if (w.week === week) classes.push('now');
-    if (data.deloadWeeks.includes(week)) classes.push('deload');
-    segments.push(`<div class="${classes.join(' ')}" title="Uge ${week}${data.deloadWeeks.includes(week) ? ' (deload)' : ''}"></div>`);
+    if (deloadWeeks.includes(week)) classes.push('deload');
+    segments.push(`<div class="${classes.join(' ')}" title="Uge ${week}${deloadWeeks.includes(week) ? ' (deload)' : ''}"></div>`);
   }
+
+  const footer = generated
+    ? `<div class="blocks one"><span>${esc(generated.name)} · fra Coach</span>
+        <button class="btn ghost small" id="clear-program">Tilbage til 12-ugers planen</button></div>`
+    : '<div class="blocks"><span>Blok 1 · Tracking-kontrol</span><span>Blok 2 · Switching og static</span><span>Blok 3 · Konsolidering</span></div>';
 
   const passCount = s.mode === 'follow' && s.total ? `<div class="today-label">${s.done} af ${s.total} pas gennemført</div>` : '';
 
@@ -47,7 +58,7 @@ function weekHero(data) {
         </div>
       </div>
       <div class="timeline">${segments.join('')}</div>
-      <div class="blocks"><span>Blok 1 · Tracking-kontrol</span><span>Blok 2 · Switching og static</span><span>Blok 3 · Konsolidering</span></div>
+      ${footer}
     </div>`;
 }
 function statusTiles(data) {
@@ -80,6 +91,74 @@ function statusTiles(data) {
     ${tile('Seneste session', sessionTile, 'clock')}
     ${tile('Krop', bodyTile, 'heart')}
   </div>`;
+}
+
+// The coach's programme suggestion, with a plain yes or no. It only shows up
+// once it knows enough about you, so before that it says which benchmarks to
+// play first instead.
+function proposalCard(data) {
+  const p = data.proposal;
+  if (!p || p.status === 'active' || p.status === 'none') return '';
+
+  if (p.status === 'needs-benchmarks') {
+    return `
+      <div class="card proposal">
+        <div class="card-head"><h2>${icon('bolt', 16)} Coach mangler data</h2>
+          <span class="pill">${p.done} af ${p.total} underkategorier</span></div>
+        <p class="secondary">Coach kan lave et program til dig, når den ved, hvor du står i alle ni underkategorier.
+          Du mangler ${p.missing.length}. Hurtigste vej er at spille hele benchmarket én gang.</p>
+        <div class="pl-buttons">
+          <button class="btn" data-open-playlist="${esc(p.playlistCode)}">${icon('bolt', 15)}Spil Voltaic S5.5 Intermediate</button>
+          <button class="btn ghost" data-copy="${esc(p.playlistCode)}">${icon('copy', 15)}<span>Kopiér kode</span></button>
+        </div>
+        <h3>Mangler</h3>
+        <ul class="closest">
+          ${p.missing.map((m) => `<li>
+            <div class="nm"><b>${esc(m.subcategory)}</b><small>${esc(m.scenario)}</small></div>
+            <button class="btn ghost small" data-open-scenario="${esc(m.scenario)}">${icon('bolt', 15)}Spil</button>
+          </li>`).join('')}
+        </ul>
+      </div>`;
+  }
+
+  if (p.status === 'dismissed') {
+    return `<div class="card proposal-slim">
+      <span class="secondary small">Du sagde nej tak til et program. Coach foreslår et nyt efter ${esc(dayLabel(p.until))}.</span>
+      <button class="btn ghost small" id="undismiss">Foreslå alligevel</button>
+    </div>`;
+  }
+
+  const program = p.program;
+  const week = program.passes.filter((pass) => pass.week === 1);
+  const stale = p.stale && p.stale.length
+    ? `<div class="alert warning">${icon('alert')}<div>${p.stale.length} af dine benchmark-resultater er over en måned gamle. Programmet bygger på dem, så overvej at teste igen først.</div></div>`
+    : '';
+
+  return `
+    <div class="card proposal">
+      <div class="card-head"><h2>${icon('chat', 16)} Coach foreslår et program</h2>
+        <span class="pill">${program.weeks} uger · ${program.daysPerWeek} dage · ca. ${program.runsPerWeek} runs/uge</span></div>
+      <p class="big-summary">${esc(program.name)}</p>
+      <p class="secondary">${esc(program.summary)}</p>
+      ${stale}
+      ${p.rationale ? `<div class="alert good">${icon('chat')}<div>${esc(p.rationale)}</div></div>` : ''}
+      <details>
+        <summary>Se ugeplanen</summary>
+        <ul class="closest">
+          ${week.map((pass) => `<li>
+            <div class="nm"><b>${esc(program.dayNames[pass.day] || pass.day)}</b><small>${esc(pass.label)}</small></div>
+            <span class="pill">${(pass.parts[0].scenarios || []).reduce((n, s) => n + s.playCount, 0)} runs</span>
+          </li>`).join('')}
+        </ul>
+        <p class="muted small">Uge 2 og 3 er de samme dage, og sidste dag er en ny benchmark-test, så du kan se forskellen.</p>
+      </details>
+      <div class="proposal-actions">
+        <button class="btn" id="accept-proposal">${icon('check', 16)}Ja tak, brug det</button>
+        <button class="btn ghost" id="reject-proposal">Nej tak</button>
+        ${!p.rationale && data.ollamaStatus && data.ollamaStatus.chatReady
+          ? `<button class="btn ghost" id="explain-proposal">${icon('chat', 15)}Hvorfor det her?</button>` : ''}
+      </div>
+    </div>`;
 }
 
 // One part of the session: a playlist (with buttons) or a list of scenarios.
@@ -251,6 +330,7 @@ function renderToday(data) {
     <div class="stack">
       ${weekHero(data)}
       ${rest}
+      ${proposalCard(data)}
       ${statusTiles(data)}
       ${todaysSession(data)}
       <div class="cols cols-2">
@@ -280,6 +360,27 @@ function renderToday(data) {
     });
   });
   document.getElementById('follow-toggle').addEventListener('change', (e) => window.api.setFollowPlan(e.target.checked));
+
+  const accept = document.getElementById('accept-proposal');
+  if (accept) accept.addEventListener('click', () => {
+    if (confirm('Brug dette program? Det bliver dit aktive program, og "Følg planen" slås til.')) window.api.acceptProposal();
+  });
+  const reject = document.getElementById('reject-proposal');
+  if (reject) reject.addEventListener('click', () => window.api.rejectProposal(data.proposal.program.kind));
+  const explain = document.getElementById('explain-proposal');
+  if (explain) {
+    explain.addEventListener('click', () => {
+      explain.disabled = true;
+      explain.textContent = 'Spørger Coach...';
+      window.api.explainProposal();
+    });
+  }
+  const clearProgram = document.getElementById('clear-program');
+  if (clearProgram) clearProgram.addEventListener('click', () => {
+    if (confirm('Stop dette program og gå tilbage til den indbyggede 12-ugers plan?')) window.api.clearProgram();
+  });
+  const undismiss = document.getElementById('undismiss');
+  if (undismiss) undismiss.addEventListener('click', () => window.api.undismissProposal());
   const markDone = document.getElementById('mark-done');
   if (markDone) {
     markDone.addEventListener('click', () => {

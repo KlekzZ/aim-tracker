@@ -69,6 +69,8 @@ function scenarioSummaries(runs, thresholds, targets) {
       rankNames,
       baselineBest: scenario.baseline_best ?? null,
       runCount: scenarioRuns.length,
+      // When you last played it, so the coach can tell fresh results from old ones.
+      lastPlayedAt: scenarioRuns.length ? scenarioRuns[scenarioRuns.length - 1].playedAt : null,
       best,
       medianLast3: median(scores.slice(-3)),
       // For Intermediate the first threshold is Platinum.
