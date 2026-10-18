@@ -93,7 +93,7 @@ async function cachePlaylists(force) {
 async function refreshOllamaStatus() {
   const running = await ollama.isRunning();
   const models = running ? await ollama.listModels().catch(() => []) : [];
-  ollamaStatus = {
+  const next = {
     checking: false,
     installed: Boolean(ollama.findInstallation()),
     running,
@@ -101,7 +101,11 @@ async function refreshOllamaStatus() {
     embedReady: ollama.hasModel(models, settings.coachEmbedModel),
     chatReady: ollama.hasModel(models, settings.coachChatModel),
   };
-  notifyPage('data-changed');
+  // This runs on a timer. Only redraw the page when something actually
+  // changed, otherwise a redraw lands in the middle of the user typing.
+  const changed = JSON.stringify(next) !== JSON.stringify(ollamaStatus);
+  ollamaStatus = next;
+  if (changed) notifyPage('data-changed');
   return ollamaStatus;
 }
 

@@ -61,7 +61,9 @@ async function embedBatch(model, texts) {
 // prompt (system rules + six knowledge chunks) doesn't fit, the start is cut
 // off. The model then loses the "answer in Danish" rule and drifts into
 // another language. A low temperature keeps it close to the sources.
-const CHAT_OPTIONS = { temperature: 0.3, num_ctx: 8192 };
+// This is sent with every request, so it overrides whatever context length
+// is set in the Ollama app itself (its default is 4096, too small for us).
+const CHAT_OPTIONS = { temperature: 0.3, num_ctx: 12288 };
 
 async function chat(model, messages, onToken) {
   const response = await net.fetch(`${BASE_URL}/api/chat`, {

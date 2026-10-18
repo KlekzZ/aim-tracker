@@ -6,6 +6,10 @@ let asking = false;
 let streamingAnswer = null; // accumulated text while a reply is streaming in
 let includeStats = true;
 let importMessage = '';
+// What you have typed so far. The page redraws whenever anything changes
+// (new run, Ollama status, streamed tokens), and without this your half
+// written question would be wiped out mid-sentence.
+let questionDraft = '';
 
 // Called by app.js as tokens arrive, so the bubble grows live.
 function appendCoachToken(piece) {
@@ -122,6 +126,12 @@ function renderCoach(data) {
     + (asking ? `<div class="msg assistant"><div class="bubble">${streamingAnswer ? esc(streamingAnswer).replace(/\n/g, '<br>') : '<span class="muted">Tænker...</span>'}</div></div>` : '');
 
   const page = document.getElementById('page-coach');
+  // Remember where the cursor was, so a redraw while you type doesn't throw
+  // you out of the field or move the cursor to the end.
+  const oldField = document.getElementById('coach-question');
+  const hadFocus = oldField && document.activeElement === oldField;
+  const caret = oldField ? oldField.selectionStart : null;
+
   page.innerHTML = `
     ${pageHead('Coach', 'En lokal AI, der kun kender dine egne kilder. Alt kører på din egen computer, intet sendes ud over det.')}
     ${setupCard(data)}
@@ -133,7 +143,7 @@ function renderCoach(data) {
         </div>
         <div class="chat-list" id="chat-list">${chatList || '<div class="empty">Stil et spørgsmål om din træning, fx "Hvorfor er min Reactive tracking svag, og hvad skal jeg øve?"</div>'}</div>
         <form id="coach-form" class="coach-input">
-          <textarea id="coach-question" rows="2" placeholder="${ready ? 'Skriv dit spørgsmål...' : 'Ollama skal være klar først...'}" ${ready ? '' : 'disabled'}></textarea>
+          <textarea id="coach-question" rows="3" placeholder="${ready ? 'Skriv dit spørgsmål...' : 'Ollama skal være klar først...'}" ${ready ? '' : 'disabled'}>${esc(questionDraft)}</textarea>
           <div class="coach-input-row">
             <label class="toggle small"><input type="checkbox" id="include-stats" ${includeStats ? 'checked' : ''}>Brug mine tal (ranks, svageste kategori, smerte)</label>
             <button type="submit" class="btn" ${ready && !asking ? '' : 'disabled'}>${icon('send', 15)}Send</button>
@@ -187,14 +197,28 @@ function renderCoach(data) {
   });
   document.getElementById('include-stats').addEventListener('change', (e) => { includeStats = e.target.checked; });
 
+  const field = document.getElementById('coach-question');
+  if (hadFocus) {
+    field.focus();
+    const at = Math.min(caret === null ? field.value.length : caret, field.value.length);
+    field.setSelectionRange(at, at);
+  }
+  field.addEventListener('input', () => { questionDraft = field.value; });
+  // Enter makes a new line (questions can be several lines); Ctrl+Enter sends.
+  field.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      document.getElementById('coach-form').requestSubmit();
+    }
+  });
+
   document.getElementById('coach-form').addEventListener('submit', (event) => {
     event.preventDefault();
-    const field = document.getElementById('coach-question');
     const question = field.value.trim();
     if (!question || asking) return;
     asking = true;
     streamingAnswer = null;
-    field.value = '';
+    questionDraft = '';
     window.api.askCoach(question, includeStats);
     renderCoach(data); // optimistic: shows "Tænker..." right away
   });

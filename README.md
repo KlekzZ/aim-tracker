@@ -1,6 +1,6 @@
 # Aim Tracker
 
-Lokal Electron-app, der læser dine KovaaK's `Stats.csv`-filer og hjælper dig med din aim-træning: scenarier, ranks, sessioner, cm/360 pr. run og et 12-ugers program, du kan følge pas for pas.
+Lokal Electron-app, der læser dine KovaaK's `Stats.csv`-filer og hjælper dig med din aim-træning: scenarier, ranks, radar over dine svagheder, sessioner, cm/360 pr. run, træningsprogrammer du kan følge pas for pas, og en lokal AI-coach.
 
 - Appen **læser kun** fra KovaaK's-mappen. Den skriver, flytter og sletter aldrig noget dér og rører ikke spillet.
 - "Åbn i KovaaK's"-knapperne bruger KovaaK's' officielle `steam://`-links.
@@ -56,5 +56,5 @@ Versionen i tagget skal passe med `package.json`.
 | `src/core/` | Parser, cm/360, database, plan, program, "Følg planen", statistik, opdateringsregler og Coach-logik (chunking, søgning). Ingen Electron, kan testes direkte |
 | `src/main/` | Electron: bootstrap, vindue, mappe-overvågning, kovaaks.com-opslag, opdatering, Ollama og Coach |
 | `src/renderer/` | Siderne (HTML/CSS/JS) og Chart.js i `vendor/` |
-| `data/` | `config.json`, Voltaic S5.5-tærskler, `targets.json` (mål for uge 4/8/12), `program.json` (12-ugers programmet) |
+| `data/` | `config.json`, Voltaic S5.5- og Viscose-tærskler, `targets.json` (mål for uge 4/8/12), `program.json` (det program du følger lige nu) |
 | `test/` | Tests (`npm test`) |
